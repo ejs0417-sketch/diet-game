@@ -1,4 +1,4 @@
-// 다이어트 게임 0.4.8 — 대표 메뉴 이름·초성 검색 (기존 음식 표 재사용)
+// 다이어트 게임 0.4.10 — 대표 메뉴 이름·초성 검색 (브랜드 메뉴 포함)
 (function(root){
 const CHO=['ㄱ','ㄲ','ㄴ','ㄷ','ㄸ','ㄹ','ㅁ','ㅂ','ㅃ','ㅅ','ㅆ','ㅇ','ㅈ','ㅉ','ㅊ','ㅋ','ㅌ','ㅍ','ㅎ'];
 const CHO_SET=new Set(CHO);
@@ -26,7 +26,9 @@ const SEARCH_SYNONYMS={
   '돈까스':['돈카츠'],
   '스시':['초밥'],
   '짜장':['짜장면'],
-  '떡볶이':['떡볶이']
+  '떡볶이':['떡볶이'],
+  '페페로':['빼빼로'],
+  '빼배로':['빼빼로']
 };
 
 // 0.4.9: 이 별칭은 질의가 별칭 전체를 다 입력했을 때만 맞춰요. ('치킨' 검색에 별칭 '치킨랩' 때문에 샐러드랩이 섞이던 문제)
@@ -68,8 +70,29 @@ function isChoseongQuery(s){
 }
 
 function foodKeys(item){
-  const names=[item.name].concat(item.aliases||[]).concat(item.searchAliases||[]);
+  const names=[item.name,item.brand].concat(item.aliases||[]).concat(item.searchAliases||[]);
   return names.filter(Boolean);
+}
+
+const GENERIC_FOOD_Q=new Set(['치킨','치즈','햄','제육','불고기','오리지널','초코','김치','마요','떡갈비','닭갈비','소불고기']);
+const BRAND_QUERY_TEXT=['봉구스','봉구스밥버거','밥버거','빼빼로','페페로','빼배로','롯데웰푸드','롯데빼빼로'];
+const BRAND_QUERY_CHO=['ㅂㄱㅅ','ㅃㅃㄹ'];
+
+function isBrandQuery(query){
+  const raw=String(query||'').trim();
+  if(!raw)return false;
+  const n=norm(raw);
+  if(BRAND_QUERY_TEXT.some(b=>n===norm(b)||n.includes(norm(b))))return true;
+  const cho=isChoseongQuery(raw)?norm(raw).split('').map(ch=>JAMO_CHO[ch]||ch).join(''):toChoseong(raw);
+  if(BRAND_QUERY_CHO.some(c=>cho===c||cho.startsWith(c)))return true;
+  return false;
+}
+
+function keysForSearch(item,qNorm,brandQ){
+  const all=foodKeys(item);
+  if(!item.brand||brandQ)return all;
+  if(GENERIC_FOOD_Q.has(qNorm))return [];
+  return (item.searchAliases||[]).concat([item.name]).filter(Boolean);
 }
 
 function scoreOne(qNorm,qCho,isCho,text){
@@ -133,11 +156,14 @@ function searchFoods(query,opts){
   const scored=[];
   list.forEach(item=>{
     let best=0,via='';
+    const brandQ=variants.some(v=>isBrandQuery(v));
+    // 브랜드 검색(봉구스·밥버거·ㅂㄱㅅ·빼빼로 등)은 해당 브랜드 메뉴만. 초성 접두가 '버거세트'·'비빔국수'에 붙지 않게 해요.
+    if(brandQ && !item.brand)return;
     variants.forEach((v,vi)=>{
       const qNorm=norm(v);
       const qCho=isChoseongQuery(v)?norm(v).split('').map(ch=>JAMO_CHO[ch]||ch).join(''):toChoseong(v);
       const isCho=isChoseongQuery(v);
-      foodKeys(item).forEach(key=>{
+      keysForSearch(item,qNorm,brandQ||isBrandQuery(v)).forEach(key=>{
         // '짜장말고짬뽕'처럼 부정 표현 별칭은 검색에서 빼요.
         if(/말고/.test(key)&&!norm(item.name).includes(qNorm))return;
         if(FULL_ONLY_ALIASES.has(key)&&key!==item.name&&qNorm.length<norm(key).length)return;
@@ -148,7 +174,7 @@ function searchFoods(query,opts){
     });
     if(best>=68)scored.push({item,score:best+unitBoost(item),via});
   });
-  scored.sort((a,b)=>b.score-a.score||a.item.name.length-b.item.name.length||String(a.item.name).localeCompare(b.item.name,'ko'));
+  scored.sort((a,b)=>b.score-a.score||(a.item.rank||99)-(b.item.rank||99)||a.item.name.length-b.item.name.length||String(a.item.name).localeCompare(b.item.name,'ko'));
   return scored.slice(0,limit);
 }
 
@@ -170,8 +196,9 @@ function resultHTML(hits,query){
   return hits.map(h=>{
     const f=h.item;
     const kcal=Math.round(+f.kcal||0);
+    const sub=[f.brand,f.cat,f.unit||'1인분'].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(' · ');
     return `<button type="button" class="meal-search-item" data-food-id="${esc(f.id)}" onclick="DGFoodSearch.pick('${escJs(f.id)}')">
-      <span class="nm"><b>${esc(f.name)}</b><span>${esc(f.cat||'')} · ${esc(f.unit||'1인분')}</span></span>
+      <span class="nm"><b>${esc(f.name)}</b><span>${esc(sub)}</span></span>
       <span class="kcal"><span class="num">${kcal.toLocaleString('ko-KR')}</span>kcal</span>
     </button>`;
   }).join('');
@@ -215,7 +242,7 @@ function pick(id){
   if(box){box.innerHTML=emptyHTML();}
 }
 
-const api={norm,toChoseong,isChoseongQuery,searchFoods,popularFoods,SEARCH_SYNONYMS,render,pick,resultHTML,emptyHTML};
+const api={norm,toChoseong,isChoseongQuery,isBrandQuery,searchFoods,popularFoods,SEARCH_SYNONYMS,render,pick,resultHTML,emptyHTML};
 root.DGFoodSearch=api;
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
