@@ -16,7 +16,10 @@
 <script src="health.js"></script>
 <script src="supplements.js"></script>
 <script src="coach.js"></script>
+<script src="delivery-foods.js"></script>
+<script src="delivery.js"></script>
 <script type="module" src="avatar.js"></script>
 <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
-if(window.DGAuth)DGAuth.boot();else{if(typeof ensureSeed==='function')ensureSeed();render();}</script>
+if(window.DGAuth)DGAuth.boot();else{if(typeof ensureSeed==='function')ensureSeed();render();}
+if(window.DGDelivery)DGDelivery.bootShare();</script>
 </body></html>

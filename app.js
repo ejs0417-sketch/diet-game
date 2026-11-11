@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.4 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치)
-const VERSION='0.4.4', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.5 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달)
+const VERSION='0.4.5', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
@@ -17,7 +17,7 @@ const ACH=[
  ['검진 등록','건강검진 결과를 처음 저장했을 때',20,'🏥']];
 const DERIVED=new Set(['quest','weekly_weight','warning']);
 
-let logDate=null,raw=load(), settings=Object.assign({goal:95,month:109,vitamins:['종합비타민']},JSON.parse(localStorage.getItem(SKEY)||'{}')), tab='home', logKind='meal', mealKind='저녁';
+let logDate=null,raw=load(), settings=Object.assign({goal:95,month:109,vitamins:['종합비타민'],favMenus:[]},JSON.parse(localStorage.getItem(SKEY)||'{}')), tab='home', logKind='meal', mealKind='저녁';
 function load(){const s=localStorage.getItem(KEY);return s?JSON.parse(s):[];}
 function ensureSeed(){if(!raw.length){raw=SEED.map(withId);localStorage.setItem(KEY,JSON.stringify(raw));}}
 function save(){localStorage.setItem(KEY,JSON.stringify(raw));if(window.DGAuth)DGAuth.schedulePush();}
@@ -71,12 +71,12 @@ function compute(T){
    if(i===1)award(d,'한 달 최소 목표','2단계와 같음',0);});};
  for(let n=Math.min(dn(first),dn(START_DATE));n<=dn(T);n++){
   const d=ds(n),es=evs.filter(e=>e.date===d),wk=week(d);
-  const info={weight:null,meals:{},kcal:0,prot:0,missingKcal:0,mealCount:0,walk:0,strength:0,strMin:0,rest:false,water:0,warn:false,bonus:0,closed:false,vit:{},vitXp:0,hq:{},hqXp:0};
+  const info={weight:null,meals:{},kcal:0,prot:0,sodium:0,missingKcal:0,mealCount:0,walk:0,strength:0,strMin:0,rest:false,water:0,warn:false,bonus:0,closed:false,vit:{},vitXp:0,hq:{},hqXp:0};
   days[d]=info;const mealRows=[],habit=[];let seenMeal={},cumWalk=0;
   for(const e of es){
    const r={date:d,type:e.type,item:e.item,value:e.value,xp:0,kcal:e.kcal||'',protein_g:e.protein_g||'',kcal_source:e.kcal_source||'',note:e.note||'',id:e.id};
    if(e.type==='weight'){if(info.weight===null){info.weight=+e.value;curW=info.weight;r.xp=10;habit.push(r);}}
-   else if(e.type==='meal'){info.mealCount++;const k=kc(e),p=pr(e);if(k===null)info.missingKcal++;else info.kcal+=k;if(p)info.prot+=p;
+   else if(e.type==='meal'){info.mealCount++;const k=kc(e),p=pr(e);if(k===null)info.missingKcal++;else info.kcal+=k;if(p)info.prot+=p;const na=rng(e.sodium_mg);if(na)info.sodium+=na;
      if(MEALS.includes(e.item)&&!seenMeal[e.item]){seenMeal[e.item]=1;r.xp=5;habit.push(r);}info.meals[e.item]=1;mealRows.push(r);}
    else if(e.type==='meal_close'){if(info.closed)continue;info.closed=true;r.item='식사마감';info.closeRow=r;}
    else if(e.type==='exercise'&&e.item==='걷기'){const m=+e.value||0;r.xp=walkXp(cumWalk+m)-walkXp(cumWalk);cumWalk+=m;info.walk=cumWalk;habit.push(r);}
@@ -218,9 +218,11 @@ function home(C){const qs=questDefs(C),show=qs.filter(q=>!q.done).slice(0,3);whi
  ${C.next?`<div class="next-stage" style="flex-direction:column;align-items:stretch;gap:2px"><div style="display:flex;justify-content:space-between"><span>다음 단계</span><span>+${C.next[1]} XP</span></div><div style="color:var(--ink-900);font-size:14px"><span class="num">${C.next[0]}kg</span> ${C.next[2]}</div></div>`:''}</div></section>
  <div class="section-title"><h2>오늘의 퀘스트 ⭐</h2><a class="link" onclick="tab='quest';render()">${all?'모두 완료! +20 XP':'모두 완료하면 +20 XP'} ›</a></div>
  ${show.map(q=>qCard(q)).join('')}
- ${(window.DGCoach?DGCoach.card(C):'')}
+ ${(window.DGCoach?DGCoach.card(C,{lastMeal:window._dgLastMealLog}):'')}
  <div class="card" style="margin-top:4px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">빠른 기록</h3><span class="stat-chip flame">🔥 스트릭 <span class="num">${C.streak}</span>일</span></div>
- <div class="quick">${quick()}</div>${vitButtons(today())}</div>
+ <div class="quick">${quick()}</div>${vitButtons(today())}
+ ${(window.DGDelivery?`<div style="margin-top:8px"><button type="button" class="btn-secondary" style="width:100%" onclick="DGDelivery.pick()">📷 배달 주문 사진으로 기록</button>${DGDelivery.chipsHTML(C)}</div>`:'')}
+ </div>
  ${(window.DGHealth?DGHealth.summaryCard():'')}
  </div>`;}
 function quick(){return `<button type="button" onclick="askWeight()"><span class="e">⚖️</span>체중</button><button type="button" onclick="tab='log';logKind='meal';mealKind=suggestMealSlot();render();setTimeout(()=>{const el=$('#mealMenu');if(el)el.focus();},50)"><span class="e">🍱</span>식사</button><button type="button" onclick="addWalk()"><span class="e">👟</span>걷기</button><button type="button" onclick="add({date:today(),type:'water',item:'물',value:'0.5',note:''})"><span class="e">💧</span>물 0.5L</button>`;}
@@ -321,7 +323,9 @@ function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0
    <label class="field" style="margin-bottom:10px"><span class="label">메뉴</span><input class="input" id="mealMenu" placeholder="메뉴를 적어 주세요"></label>
    <div class="rowx" style="margin-bottom:14px"><label class="field"><span class="label">kcal <span class="muted">(선택)</span></span><input class="input" id="kcal" type="number" placeholder="예: 520" inputmode="numeric"></label>
    <label class="field"><span class="label">단백질 g <span class="muted">(선택)</span></span><input class="input" id="prot" type="number" placeholder="예: 40" inputmode="numeric"></label></div>
-   <button type="button" class="btn-primary btn-lg" onclick="sub('meal')">식사 기록하기 <span class="stat-chip gold" style="min-height:26px;padding:0 8px;font-size:12px;box-shadow:none">+5 XP</span></button>`,
+   <button type="button" class="btn-primary btn-lg" onclick="sub('meal')">식사 기록하기 <span class="stat-chip gold" style="min-height:26px;padding:0 8px;font-size:12px;box-shadow:none">+5 XP</span></button>
+   <button type="button" class="btn-secondary" style="width:100%;margin-top:8px" onclick="DGDelivery.pick()">📷 배달 주문 사진으로 기록</button>
+   ${(window.DGDelivery?DGDelivery.chipsHTML(C):'')}`,
   exercise:`<div class="segmented" data-seg="ex" style="margin-bottom:12px" role="tablist"><button type="button" data-k="걷기" aria-selected="true" onclick="this.parentNode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-selected',b===this));this.parentNode.dataset.v='걷기'">걷기</button><button type="button" data-k="근력" aria-selected="false" onclick="this.parentNode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-selected',b===this));this.parentNode.dataset.v='근력'">근력</button></div>
    <label class="field" style="margin-bottom:14px"><span class="label">시간(분)</span><input class="input" id="min" type="number" placeholder="예: 40" inputmode="numeric"></label>
    <button type="button" class="btn-primary btn-lg" onclick="sub('exercise')">운동 기록하기</button>`,

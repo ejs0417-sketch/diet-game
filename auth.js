@@ -59,7 +59,8 @@ const DGAuth=(function(){
   }
   function profileOf(){
     const u=session&&session.user;
-    return {goal:settings.goal,month:settings.month,height:HEIGHT,display_name:(u&&(u.name||u.email))||'',vitamins:Array.isArray(settings.vitamins)?settings.vitamins.slice():['종합비타민']};
+    const favs=Array.isArray(settings.favMenus)?settings.favMenus.map(f=>({name:f.name,dishId:f.dishId||'',count:+f.count||1,last:f.last||'',store:f.store||'',kcal:f.kcal,protein:f.protein,carbs:f.carbs,fat:f.fat,sodium:f.sodium})):[];
+    return {goal:settings.goal,month:settings.month,height:HEIGHT,display_name:(u&&(u.name||u.email))||'',vitamins:Array.isArray(settings.vitamins)?settings.vitamins.slice():['종합비타민'],favMenus:favs};
   }
   function applyProfile(p){
     if(!p||typeof p!=='object')return;
@@ -68,6 +69,10 @@ const DGAuth=(function(){
     if(Array.isArray(p.vitamins)){
       const vs=[...new Set(p.vitamins.map(x=>String(x).trim()).filter(Boolean))];
       settings.vitamins=vs.length?vs:(settings.vitamins||['종합비타민']);
+    }
+    if(Array.isArray(p.favMenus)){
+      const local=Array.isArray(settings.favMenus)?settings.favMenus:[];
+      settings.favMenus=(typeof DGDelivery!=='undefined'&&DGDelivery.mergeFavs)?DGDelivery.mergeFavs(local,p.favMenus):p.favMenus.slice();
     }
     localStorage.setItem(SKEY,JSON.stringify(settings));
   }
@@ -389,7 +394,7 @@ const DGAuth=(function(){
     clearSession();
     localStorage.removeItem(GATEKEY);
     if(wipe){
-      raw=[]; settings={goal:95,month:109,vitamins:['종합비타민']};
+      raw=[]; settings={goal:95,month:109,vitamins:['종합비타민'],favMenus:[]};
       localStorage.removeItem(KEY); localStorage.removeItem(SKEY);
     }
     toast(wipe?'계정을 삭제하고 폰 기록도 지웠어요':'계정을 삭제했어요. 이 폰 기록은 남아 있어요.');

@@ -334,6 +334,39 @@ function loadTesseract(){
     document.head.appendChild(s);
   });
 }
+function blobToCanvas(blob){
+  return new Promise((res,rej)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(blob);
+    img.onload=()=>{
+      const max=1600;let w=img.width,h=img.height;
+      if(Math.max(w,h)>max){const s=max/Math.max(w,h);w=Math.round(w*s);h=Math.round(h*s);}
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(img,0,0,w,h);
+      URL.revokeObjectURL(url);res(c);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('image'));};
+    img.src=url;
+  });
+}
+async function ocrImage(src){
+  await loadTesseract();
+  const T=root.Tesseract;if(!T)throw new Error('ocr-unavailable');
+  const base=appBase();
+  const worker=await T.createWorker('kor+eng',1,{
+    workerPath:base+'vendor/tesseract/worker.min.js',
+    corePath:base+'vendor/tesseract/tesseract-core-simd-lstm.wasm.js',
+    langPath:base+'vendor/tesseract/lang',
+    workerBlobURL:false,gzip:false
+  });
+  try{
+    let target=src;
+    if(src&&(src instanceof Blob || (typeof File!=='undefined'&&src instanceof File)))target=await blobToCanvas(src);
+    const res=await worker.recognize(target);
+    return (res&&res.data&&res.data.text)||'';
+  }finally{try{await worker.terminate();}catch(e){}}
+}
+
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
@@ -585,7 +618,7 @@ function questBlock(){
 const api={
   HKEY,HQ_CAP,HQ_XP,QUESTS,FIELDS,DISCLAIMER,
   parseText,classify,levelOf,conditions,questsFor,flagGroups,reminderDate,urineLevel,
-  loadHealth,saveHealth,latest,extractPdfFile,
+  loadHealth,saveHealth,latest,extractPdfFile,ocrImage,loadTesseract,blobToCanvas,
   pickPdf,openManual,openLatest,openPane,close:closePane,closePane,saveDraft:saveDraftSmart,editCurrent,wipe,importFile,
   summaryCard,questBlock,toggleQuest,renderPane,
   hasMeaningfulText

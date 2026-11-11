@@ -121,3 +121,8 @@ body.gate main,body.gate nav{display:none}
 
 .banner.banner.warn .list-row,.banner.banner.flat .list-row{border-bottom:1px solid rgba(0,0,0,.06);align-items:flex-start}
 .banner .list-row .m span{white-space:normal;overflow:visible;text-overflow:unset}
+
+.dv-row.off{opacity:.45}
+.fav-chips{margin-bottom:4px}
+.fav-chips .chip{background:#fff}
+.health-sheet .segmented[data-seg=por]{grid-template-columns:repeat(4,1fr)}

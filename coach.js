@@ -1,14 +1,26 @@
-// 다이어트 게임 0.4.4 — 규칙 기반 코치 (기기 안, 참고용)
+// 다이어트 게임 0.4.5 — 규칙 기반 코치 (기기 안, 참고용)
 (function(root){
 const DISCLAIMER='건강 정보는 참고용이에요. 진단이 아니며, 정확한 판단은 의사에게 받으세요.';
 const SOURCE='기준: 식단 1,600~2,000kcal · 단백질 130g+, 물 2L, 걷기 40~60분 (게임 규칙). 검진 표시는 국가건강검진 판정을 참고했어요.';
 
-function tips(C){
+function tips(C,ctx){
   if(!C||!C.days)return [];
+  ctx=ctx||{};
   const d=C.today|| (typeof today==='function'?today():'');
   const t=C.days[d]||{};
   const out=[];
   const push=(id,text,pri)=>out.push({id,text,pri});
+  const last=ctx.lastMeal|| (typeof window!=='undefined'&&window._dgLastMealLog);
+  if(last&&last.value&&(!last.date||last.date===d)){
+    const k=+last.kcal||0,p=+(last.protein_g!=null?last.protein_g:last.protein)||0,na=+(last.sodium_mg!=null?last.sodium_mg:last.sodium)||0;
+    const slot=last.item||'이 끼니';
+    push('meal-just','방금 '+slot+' '+last.value+'는 약 '+Math.round(k)+'kcal, 단백질 '+Math.round(p)+'g'+(na?(', 나트륨 '+Math.round(na)+'mg'):'')+'이에요.',8);
+    const remainK=1800-(t.kcal||0),remainP=130-(t.prot||0);
+    if(remainP>40)push('next-prot','다음 끼니는 단백질 '+Math.round(remainP)+'g 정도를 채워 보세요. 포케·국밥·닭가슴살샐러드가 잘 맞아요.',9);
+    else if(remainK<400)push('next-light','오늘은 벌써 '+Math.round(t.kcal||0)+'kcal예요. 다음 끼니는 가볍게 샐러드나 국물로 맞춰 보세요.',9);
+    else push('next-kcal','다음 끼니는 대략 '+Math.round(Math.max(0,remainK))+'kcal, 단백질 '+Math.round(Math.max(0,remainP))+'g을 목표로 하면 하루 균형이 맞아요.',9);
+    if((t.sodium||0)>=1600)push('na','오늘 나트륨이 약 '+Math.round(t.sodium)+'mg이에요. 목표 2,300mg(한국인 영양소 섭취기준) 안쪽으로 다음 끼니는 싱겁게 해 보세요.',10);
+  }
   // checkup flags (short, non-diagnostic)
   try{
     if(typeof DGHealth!=='undefined'&&DGHealth.latest){
@@ -82,8 +94,8 @@ function weekSummary(C){
   return {days:last.length,from:last[0],to:last[last.length-1],lines};
 }
 
-function card(C){
-  const t=tips(C);
+function card(C,ctx){
+  const t=tips(C,ctx);
   const w=weekSummary(C);
   const tipsH=t.length?t.map(x=>`<div class="coach-tip">${esc(x.text)}</div>`).join(''):'<div class="muted">기록이 쌓이면 오늘 팁을 보여 드려요.</div>';
   const weekH=w?`<div class="coach-week"><b>이번 주 한눈에</b>${w.lines.map(l=>`<div>${esc(l)}</div>`).join('')}</div>`:'';
