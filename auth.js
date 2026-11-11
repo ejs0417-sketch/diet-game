@@ -61,7 +61,16 @@ const DGAuth=(function(){
     const u=session&&session.user;
     const favs=Array.isArray(settings.favMenus)?settings.favMenus.map(f=>({name:f.name,dishId:f.dishId||'',count:+f.count||1,last:f.last||'',store:f.store||'',kcal:f.kcal,protein:f.protein,carbs:f.carbs,fat:f.fat,sodium:f.sodium})):[];
     const leftovers=(typeof DGDelivery!=='undefined'&&DGDelivery.mergeLeftovers?DGDelivery.mergeLeftovers(settings.leftovers||[],[]):(Array.isArray(settings.leftovers)?settings.leftovers:[])).map(x=>(typeof DGDelivery!=='undefined'&&DGDelivery.sanitizeLeftover?DGDelivery.sanitizeLeftover(x):x)).filter(Boolean);
-    return {goal:settings.goal,month:settings.month,height:HEIGHT,display_name:(u&&(u.name||u.email))||'',vitamins:Array.isArray(settings.vitamins)?settings.vitamins.slice():['종합비타민'],favMenus:favs,leftovers};
+    let faceParams=null;
+    try{
+      const raw=localStorage.getItem('dg_face_v1');
+      if(raw&&!raw.startsWith('data:')){
+        const o=JSON.parse(raw);
+        faceParams=(typeof DGFace!=='undefined'&&DGFace.sanitize)?DGFace.sanitize(o):o;
+        if(faceParams){delete faceParams.photo;delete faceParams.photoDataUrl;delete faceParams.dataUrl;delete faceParams.image;delete faceParams._ms;}
+      }
+    }catch(e){faceParams=null;}
+    return {goal:settings.goal,month:settings.month,height:HEIGHT,display_name:(u&&(u.name||u.email))||'',vitamins:Array.isArray(settings.vitamins)?settings.vitamins.slice():['종합비타민'],favMenus:favs,leftovers,faceParams};
   }
   function applyProfile(p){
     if(!p||typeof p!=='object')return;
@@ -78,6 +87,19 @@ const DGAuth=(function(){
     if(Array.isArray(p.leftovers)){
       const local=Array.isArray(settings.leftovers)?settings.leftovers:[];
       settings.leftovers=(typeof DGDelivery!=='undefined'&&DGDelivery.mergeLeftovers)?DGDelivery.mergeLeftovers(local,p.leftovers):p.leftovers.slice();
+    }
+    if(p.faceParams&&typeof p.faceParams==='object'){
+      const incoming=(typeof DGFace!=='undefined'&&DGFace.sanitize)?DGFace.sanitize(p.faceParams):p.faceParams;
+      delete incoming.photo;delete incoming.photoDataUrl;delete incoming.image;delete incoming.dataUrl;
+      try{
+        let local={};
+        const raw=localStorage.getItem('dg_face_v1');
+        if(raw&&!raw.startsWith('data:')) local=JSON.parse(raw)||{};
+        const merged=(typeof DGFace!=='undefined'&&DGFace.sanitize)?DGFace.sanitize(Object.assign({},local,incoming)):Object.assign({},local,incoming);
+        delete merged.photo;
+        localStorage.setItem('dg_face_v1',JSON.stringify(merged));
+        if(window.DGAvatar)DGAvatar.setLook(merged);
+      }catch(e){}
     }
     localStorage.setItem(SKEY,JSON.stringify(settings));
   }

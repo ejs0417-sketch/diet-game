@@ -131,3 +131,11 @@ body.gate main,body.gate nav{display:none}
 .leftover-block{margin-top:8px}
 .lo-card{margin:0 0 8px;padding:12px}
 .eaten-seg{grid-template-columns:repeat(5,1fr)}
+
+.face-tune{margin:8px 0 12px}
+.face-tune>summary{cursor:pointer;font-weight:700;color:var(--ink-900);padding:8px 0}
+.face-slider{display:block;margin:6px 0}
+.face-slider .label{font-size:12px;margin-bottom:2px}
+.chip.swatch{width:32px;height:32px;min-width:32px;padding:0;border-radius:50%;background:var(--sw,#ccc);border:2px solid var(--line)}
+.chip.swatch.on{box-shadow:0 0 0 3px var(--mint-400);border-color:#fff}
+.face-check{display:flex;align-items:center;gap:8px;font-weight:700}

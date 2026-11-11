@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.6 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달)
-const VERSION='0.4.6', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.7 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달)
+const VERSION='0.4.7', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
@@ -441,78 +441,117 @@ function vitCard(){migrateVitaminsOnce();const items=vitList();
   <div class="rowx"><input class="input" id="vitNew" placeholder="없으면 이름만 적어 추가"><button type="button" class="btn-primary" onclick="addVitName()">추가</button></div>
   <div class="muted" style="font-size:11px;margin-top:8px">${esc((typeof DGSup!=='undefined'&&DGSup.DISCLAIMER)||'건강 정보는 참고용이에요. 진단이 아니며, 정확한 판단은 의사에게 받으세요.')}</div>
  </div>`;}
-// ---------- 나 만들기 (3D 아바타) ----------
+// ---------- 나 만들기 (3D 캐릭터, 사진은 모델에 붙이지 않음) ----------
 const FACEKEY='dg_face_v1';let pvKg=null,meBase=null;
 function faceStore(){
- const def={photo:null,skin:'warm',hairColor:'darkbrown',hairStyle:'short',faceShape:'oval'};
- try{const s=localStorage.getItem(FACEKEY);if(!s)return Object.assign({},def);
-  if(s.startsWith('data:'))return Object.assign({},def,{photo:s});
-  const o=JSON.parse(s);return Object.assign({},def,o&&typeof o==='object'?o:{});}
- catch(e){return Object.assign({},def);}
+ const def=(window.DGFace&&DGFace.sanitize)?DGFace.sanitize({}):{skin:'#f6c9a4',hairColor:'#2b2522',hairStyle:'short',faceWidth:.5,faceLength:.5,jawWidth:.5,cheekWidth:.5,chin:.5,eyeSize:.5,eyeSpacing:.5,eyeTilt:.5,eyeColor:'#2a211d',browThick:.5,browAngle:.5,browColor:'#2b2522',noseWidth:.5,noseLength:.5,mouthWidth:.5,lipThick:.5,earY:.5,hairVolume:.5,glasses:false,beard:'none'};
+ try{
+  const s=localStorage.getItem(FACEKEY);if(!s)return Object.assign({},def);
+  if(s.startsWith('data:')){try{localStorage.setItem(FACEKEY,JSON.stringify(def));}catch(e){}return Object.assign({},def);}
+  const o=JSON.parse(s);
+  const clean=(window.DGFace&&DGFace.sanitize)?DGFace.sanitize(o||{}):Object.assign({},def,o||{});
+  if(o&&(o.photo||o.photoDataUrl||o.dataUrl||o.image)){try{localStorage.setItem(FACEKEY,JSON.stringify(clean));}catch(e){}}
+  return clean;
+ }catch(e){return Object.assign({},def);}
 }
 function saveFaceStore(patch){
- const cur=Object.assign(faceStore(),patch||{});
+ const cur=(window.DGFace&&DGFace.sanitize)?DGFace.sanitize(Object.assign({},faceStore(),patch||{})):Object.assign({},faceStore(),patch||{});
+ delete cur.photo;delete cur.photoDataUrl;delete cur.dataUrl;delete cur.image;
  try{localStorage.setItem(FACEKEY,JSON.stringify(cur));}catch(e){toast('저장 공간이 부족해요');return false;}
- if(window.DGAvatar){DGAvatar.setLook(cur);if(patch&&('photo' in patch))DGAvatar.setFace(cur.photo||null);}
+ if(window.DGAvatar)DGAvatar.setLook(cur);
+ if(window.DGAuth&&DGAuth.schedulePush)DGAuth.schedulePush();
  return true;
 }
-const LOOK_LABELS={
- skin:{light:'밝은',warm:'따뜻한',medium:'중간',tan:'구릿빛',deep:'깊은'},
- hairColor:{black:'검정',darkbrown:'진갈색',brown:'갈색',auburn:'적갈색',blonde:'밝은',gray:'회색'},
- hairStyle:{short:'짧은',side:'사이드',buzz:'짧게 밀기',curly:'컬'},
- faceShape:{oval:'계란형',round:'둥근',long:'긴',square:'각진'}
-};
-function makeMe(C){const base=meBase??+C.avatarW.toFixed(1),goal=settings.goal,v=pvKg??base,st=faceStore(),hasFace=!!st.photo;
+const HAIR_STYLE_LABEL={buzz:'짧게 밀기',short:'짧은',side:'사이드',curly:'컬',volume:'볼륨',long:'긴'};
+const BEARD_LABEL={none:'없음',stubble:'수염 그림자',short:'짧은 수염',full:'수염'};
+const SKIN_SWATCH={light:'#f8d7c4',warm:'#f6c9a4',medium:'#c6865b',tan:'#a0643c',deep:'#6b3d26'};
+const HAIR_SWATCH={black:'#1a1412',darkbrown:'#2b2522',brown:'#5a3a22',auburn:'#6b2e1f',blonde:'#c6a15b',gray:'#8a8680'};
+function slider(key,label,val){
+ return `<label class="face-slider"><span class="label">${label}</span><input class="range" type="range" min="0" max="100" step="1" value="${Math.round((+val||0)*100)}" oninput="tuneFace('${key}',this.value/100)"></label>`;
+}
+function makeMe(C){const base=meBase??+C.avatarW.toFixed(1),goal=settings.goal,v=pvKg??base,st=faceStore();
  const lo=86;
- const pick=(key,cur)=>Object.keys(LOOK_LABELS[key]).map(k=>`<button type="button" class="chip${cur===k?' on':''}" onclick="setLookField('${key}','${k}')">${LOOK_LABELS[key][k]}</button>`).join('');
- return `<div class="card" id="makeMe"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">🧍 나 만들기</h3><span class="muted">좌우로 밀면 돌아가요</span></div>
+ const hairBtns=Object.keys(HAIR_STYLE_LABEL).map(k=>`<button type="button" class="chip${st.hairStyle===k?' on':''}" onclick="tuneFace('hairStyle','${k}')">${HAIR_STYLE_LABEL[k]}</button>`).join('');
+ const beardBtns=Object.keys(BEARD_LABEL).map(k=>`<button type="button" class="chip${st.beard===k?' on':''}" onclick="tuneFace('beard','${k}')">${BEARD_LABEL[k]}</button>`).join('');
+ const skinBtns=Object.keys(SKIN_SWATCH).map(k=>`<button type="button" class="chip swatch${(st.skin||'').toLowerCase()===SKIN_SWATCH[k]?' on':''}" style="--sw:${SKIN_SWATCH[k]}" onclick="tuneFace('skin','${SKIN_SWATCH[k]}')"></button>`).join('');
+ const hairCBtns=Object.keys(HAIR_SWATCH).map(k=>`<button type="button" class="chip swatch${(st.hairColor||'').toLowerCase()===HAIR_SWATCH[k]?' on':''}" style="--sw:${HAIR_SWATCH[k]}" onclick="tuneFace('hairColor','${HAIR_SWATCH[k]}')"></button>`).join('');
+ return `<div class="card" id="makeMe"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">🧍 내 캐릭터 만들기</h3><span class="muted">좌우로 밀면 돌아가요</span></div>
+ <div class="muted" style="margin:8px 0 0">사진으로 얼굴을 분석해 3D로 조각해요. 사진을 인형에 붙이지 않고, 분석이 끝나면 사진은 버려요.</div>
  <div style="margin:12px 0"><div class="avatar-frame" id="avatarSlot" style="height:330px" data-kg="${v}" data-idle="0.25"><img class="fallback" src="char.png" alt="캐릭터"><div class="pedestal"></div><div class="avcap" id="pvCap">${pvLabel(base,v)}</div></div></div>
  <div class="rowx" style="margin-bottom:6px"><label class="field"><span class="label">키(cm) 🔒</span><input class="input" type="number" value="${HEIGHT}" disabled></label>
  <label class="field"><span class="label">현재 체중(kg)</span><input class="input" id="meW" type="number" step="0.1" value="${base}" onchange="setBase(this.value)"></label></div>
- <div class="muted" style="margin-bottom:12px">키는 186cm로 고정이고, 배·허리·팔·다리·볼 두께만 바뀌어요. 홈 아바타는 최근 7일 체중 평균(${C.avatarW.toFixed(1)}kg)을 따라가요.</div>
+ <div class="muted" style="margin-bottom:12px">키는 186cm로 고정이고, 몸매는 체중에 따라 Slim 모프로 바뀌어요. 홈 아바타는 최근 7일 체중 평균(${C.avatarW.toFixed(1)}kg)을 따라가요.</div>
  <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="color:var(--ink-900)">목표 체형 미리보기</b><span class="num" style="font-weight:800;color:var(--coral-600)">${(+v).toFixed(1)}kg</span></div>
  <input class="range" id="pv" type="range" min="${lo}" max="${Math.max(base,lo+1)}" step="0.5" value="${v}" oninput="previewKg(this.value)">
  <div class="rowx" style="margin-bottom:14px"><button type="button" class="btn-secondary btn-sm" onclick="previewKg(${base})">지금 ${base}kg</button><button type="button" class="btn-secondary btn-sm" style="border-color:var(--mint-500);color:var(--mint-700);background:var(--mint-50)" onclick="previewKg(${goal})">목표 ${goal}kg</button><button type="button" class="btn-secondary btn-sm" onclick="previewKg(86)">86kg</button></div>
- <b style="color:var(--ink-900)">나처럼 보이게</b>
- <div class="muted" style="margin:6px 0 8px">사진으로 피부·머리·얼굴형을 추정하고, 아래에서 바로 고칠 수 있어요. 사진은 이 폰 안에만 남아요.</div>
+ <b style="color:var(--ink-900)">사진으로 내 얼굴 모델링</b>
+ <div class="muted" style="margin:6px 0 8px">정면 사진을 찍거나 고르면, 이 폰 안에서 이목구비를 읽고 3D 캐릭터를 만들어요. 사진은 저장하지 않아요.</div>
  <div style="display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap">
   <button type="button" class="btn-primary btn-sm" onclick="openCam()">📷 카메라로 찍기</button>
   <label class="btn-secondary btn-sm" style="display:inline-flex;cursor:pointer">갤러리에서 고르기<input type="file" accept="image/*" style="display:none" onchange="pickFace(this.files[0])"></label>
-  ${hasFace?'<button type="button" class="btn-ghost btn-sm" onclick="delFace()">사진 지우기</button>':''}
+  <button type="button" class="btn-ghost btn-sm" onclick="resetFace()">캐릭터 초기화</button>
  </div>
- <div class="look-block"><div class="label">피부톤</div><div class="look-picks">${pick('skin',st.skin)}</div></div>
- <div class="look-block"><div class="label">머리 색</div><div class="look-picks">${pick('hairColor',st.hairColor)}</div></div>
- <div class="look-block"><div class="label">머리 모양</div><div class="look-picks">${pick('hairStyle',st.hairStyle)}</div></div>
- <div class="look-block"><div class="label">얼굴형</div><div class="look-picks">${pick('faceShape',st.faceShape)}</div></div>
- <div class="muted">🔒 사진은 이 폰 안에만 저장돼요. 어디에도 올리지 않아요.</div></div>`;}
-function setLookField(key,val){if(!saveFaceStore({[key]:val}))return;toast('아바타에 반영했어요');render();}
+ <details class="face-tune" open><summary>손으로 다듬기</summary>
+  <div class="look-block"><div class="label">얼굴형</div>
+   ${slider('faceWidth','너비',st.faceWidth)}${slider('faceLength','길이',st.faceLength)}${slider('jawWidth','턱 너비',st.jawWidth)}${slider('cheekWidth','볼',st.cheekWidth)}${slider('chin','턱 끝',st.chin)}</div>
+  <div class="look-block"><div class="label">눈</div>
+   ${slider('eyeSize','크기',st.eyeSize)}${slider('eyeSpacing','간격',st.eyeSpacing)}${slider('eyeTilt','기울기',st.eyeTilt)}</div>
+  <div class="look-block"><div class="label">눈썹</div>
+   ${slider('browThick','두께',st.browThick)}${slider('browAngle','각도',st.browAngle)}</div>
+  <div class="look-block"><div class="label">코 · 입</div>
+   ${slider('noseWidth','코 너비',st.noseWidth)}${slider('noseLength','코 길이',st.noseLength)}${slider('mouthWidth','입 너비',st.mouthWidth)}${slider('lipThick','입술',st.lipThick)}</div>
+  <div class="look-block"><div class="label">머리스타일</div><div class="look-picks">${hairBtns}</div>
+   ${slider('hairVolume','볼륨',st.hairVolume)}
+   <div class="label" style="margin-top:8px">머리 색</div><div class="look-picks">${hairCBtns}</div></div>
+  <div class="look-block"><div class="label">피부톤</div><div class="look-picks">${skinBtns}</div></div>
+  <div class="look-block"><div class="label">안경 · 수염</div>
+   <label class="face-check"><input type="checkbox" ${st.glasses?'checked':''} onchange="tuneFace('glasses',this.checked)"> 안경</label>
+   <div class="look-picks" style="margin-top:8px">${beardBtns}</div></div>
+ </details>
+ <div class="muted">🔒 사진은 분석이 끝나면 버려요. 남는 것은 얼굴 숫자값뿐이에요. 이 값은 계정과 함께 동기화될 수 있고, 사진은 올리지 않아요.</div></div>`;}
+function tuneFace(key,val){if(!saveFaceStore({[key]:val}))return;}
 function pvLabel(base,v){const d=+(base-v).toFixed(1);return d>0?`지금 ${(+base).toFixed(1)}kg → 미리보기 ${(+v).toFixed(1)}kg (−${d.toFixed(1)}kg)`:`지금 ${(+base).toFixed(1)}kg`;}
 function previewKg(v){v=+v;pvKg=v;const base=meBase??+compute().avatarW.toFixed(1);const r=$('#pv');if(r)r.value=v;const c=$('#pvCap');if(c)c.textContent=pvLabel(base,v);
  const kgEl=document.querySelector('#makeMe .num[style*="coral"]');if(kgEl)kgEl.textContent=v.toFixed(1)+'kg';
  if(window.DGAvatar)DGAvatar.setWeight(v);}
 function setBase(v){v=+v;if(!(v>=40&&v<=250))return;meBase=v;pvKg=v;render();}
-function applyPhotoData(url,guessed){
- const patch={photo:url};
- if(guessed){['skin','hairColor','hairStyle','faceShape'].forEach(k=>{if(guessed[k])patch[k]=guessed[k];});}
- if(!saveFaceStore(patch))return;
- if(window.DGAvatar){DGAvatar.setLook(faceStore());DGAvatar.setFace(url);}
- toast(guessed?'사진으로 추정했어요. 아래 칸에서 고칠 수 있어요':'얼굴을 입혔어요 (폰에만 저장)');
- render();
+function resetFace(){if(!confirm('캐릭터 얼굴을 기본값으로 되돌릴까요?'))return;
+ if(!saveFaceStore(window.DGFace?DGFace.DEFAULTS:{}))return;toast('기본 캐릭터로 바꿨어요');render();}
+function openAnalyze(msg){
+ let el=$('#facePane');if(!el){el=document.createElement('div');el.id='facePane';el.className='health-pane';document.body.appendChild(el);}
+ el.innerHTML=`<div class="health-sheet"><div class="card"><h3>얼굴을 보고 있어요</h3><p class="muted">${esc(msg||((window.DGFace&&DGFace.PRIVACY)||'사진은 이 폰 안에서만 보고, 분석이 끝나면 버려요.'))}</p></div></div>`;
+ el.scrollTop=0;
 }
-function pickFace(file){if(!file)return;const fr=new FileReader();fr.onload=()=>{const img=new Image();img.onload=()=>{
-  const S=256,c=document.createElement('canvas');c.width=c.height=S;const x=c.getContext('2d'),m=Math.min(img.width,img.height);
-  x.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,S,S);const url=c.toDataURL('image/jpeg',0.85);
-  const g=guessLookFromCanvas(c);
-  applyPhotoData(url,g);
- };img.onerror=()=>toast('사진을 읽지 못했어요');img.src=fr.result;};fr.readAsDataURL(file);}
-function delFace(){if(!confirm('얼굴 사진을 지울까요? 피부·머리 설정은 남아요.'))return;
- if(!saveFaceStore({photo:null}))return;if(window.DGAvatar)DGAvatar.setFace(null);toast('사진을 지웠어요');render();}
+function closeAnalyze(){const el=$('#facePane');if(el)el.remove();}
+async function applyFaceImage(img){
+ openAnalyze('얼굴을 읽고 3D로 조각하고 있어요. 사진은 저장하지 않아요.');
+ try{
+  if(!window.DGFace||!DGFace.analyze)throw new Error('no-face-mod');
+  const params=await DGFace.analyze(img);
+  if(!saveFaceStore(params))return;
+  toast('내 캐릭터를 만들었어요. 아래 칸에서 다듬을 수 있어요');
+  render();
+ }catch(e){
+  if(e&&e.code==='no-face')toast('얼굴을 찾지 못했어요. 밝은 곳에서 정면 사진으로 다시 해 주세요');
+  else toast('얼굴을 읽지 못했어요. 잠시 후 다시 시도해 주세요');
+ }finally{closeAnalyze();}
+}
+function loadImgFromUrl(url){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(new Error('img'));im.src=url;});}
+function pickFace(file){
+ if(!file)return;
+ const fr=new FileReader();
+ fr.onload=()=>{
+  loadImgFromUrl(fr.result).then(im=>applyFaceImage(im)).catch(()=>toast('사진을 읽지 못했어요'))
+   .finally(()=>{try{fr.result&&URL.revokeObjectURL&&0;}catch(e){}});
+ };
+ fr.readAsDataURL(file);
+}
 let camStream=null,camUrl=null;
 function openCam(){
  closeCam(true);
  const el=document.createElement('div');el.id='camPane';el.className='cam-pane';
  el.innerHTML=`<div class="health-sheet cam-sheet"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h2 style="margin:0">나 찍기</h2><button type="button" class="btn-ghost btn-sm" onclick="closeCam()">닫기</button></div>
-  <div class="muted" style="margin-bottom:8px">전면 카메라로 찍어요. 사진은 이 폰에만 남고 서버로 가지 않아요.</div>
+  <div class="muted" style="margin-bottom:8px">전면 카메라로 찍어요. 사진은 분석에만 쓰고 저장하지 않아요.</div>
   <div class="cam-box"><video id="camVideo" autoplay playsinline muted></video><canvas id="camSnap" hidden></canvas><img id="camPreview" alt="" hidden></div>
   <div class="rowx" style="margin-top:12px" id="camActions"><button type="button" class="btn-primary btn-lg" onclick="snapCam()">촬영</button></div>
   <div class="muted" style="margin-top:8px">카메라를 쓸 수 없으면 갤러리에서 고르기를 이용해 주세요.</div></div>`;
@@ -531,83 +570,35 @@ async function startCam(){
 }
 function snapCam(){
  const v=$('#camVideo');if(!v||!v.videoWidth)return toast('카메라가 아직 준비 중이에요');
- const S=256,c=$('#camSnap')||document.createElement('canvas');c.width=c.height=S;
+ const S=512,c=$('#camSnap')||document.createElement('canvas');c.width=c.height=S;
  const x=c.getContext('2d');
  const m=Math.min(v.videoWidth,v.videoHeight);
- // mirror front camera so preview feels natural, but store unmirrored? keep mirrored as selfie
  x.translate(S,0);x.scale(-1,1);
  x.drawImage(v,(v.videoWidth-m)/2,(v.videoHeight-m)/2,m,m,0,0,S,S);
- camUrl=c.toDataURL('image/jpeg',0.85);
+ camUrl=c.toDataURL('image/jpeg',0.9);
  const img=$('#camPreview');if(img){img.src=camUrl;img.hidden=false;}
  if(v)v.hidden=true;
- const a=$('#camActions');if(a)a.innerHTML=`<button type="button" class="btn-secondary" onclick="retakeCam()">다시 찍기</button><button type="button" class="btn-primary" onclick="useCamShot()">이 사진 쓰기</button>`;
+ const a=$('#camActions');if(a)a.innerHTML=`<button type="button" class="btn-secondary" onclick="retakeCam()">다시 찍기</button><button type="button" class="btn-primary" onclick="useCamShot()">이 사진으로 만들기</button>`;
 }
-function retakeCam(){camUrl=null;const img=$('#camPreview');if(img)img.hidden=true;const v=$('#camVideo');if(v)v.hidden=false;
+function retakeCam(){camUrl=null;const img=$('#camPreview');if(img){img.removeAttribute('src');img.hidden=true;}const v=$('#camVideo');if(v)v.hidden=false;
  const a=$('#camActions');if(a)a.innerHTML=`<button type="button" class="btn-primary btn-lg" onclick="snapCam()">촬영</button>`;}
-function useCamShot(){
+async function useCamShot(){
  if(!camUrl)return;
  const url=camUrl;
- const c=document.createElement('canvas');c.width=c.height=256;const im=new Image();
- im.onload=()=>{const x=c.getContext('2d');x.drawImage(im,0,0,256,256);const g=guessLookFromCanvas(c);closeCam();applyPhotoData(url,g);};
- im.src=url;
+ try{
+  const im=await loadImgFromUrl(url);
+  closeCam();
+  await applyFaceImage(im);
+ }catch(e){toast('사진을 읽지 못했어요');closeCam();}
+ camUrl=null;
 }
 function closeCam(keep){
  if(camStream){camStream.getTracks().forEach(tr=>tr.stop());camStream=null;}
  if(!keep)camUrl=null;
  const el=$('#camPane');if(el)el.remove();
 }
-function isSkinPix(r,g,b){const y=0.299*r+0.587*g+0.114*b,cb=128-0.168736*r-0.331264*g+0.5*b,cr=128+0.5*r-0.418688*g-0.081312*b;
- return y>50&&cr>133&&cr<185&&cb>77&&cb<135&&r>=g&&g>=b*0.7;}
-function skinToneFromRgb(r,g,b){const L=0.299*r+0.587*g+0.114*b;if(L>=218)return 'light';if(L>=175)return 'warm';if(L>=130)return 'medium';if(L>=90)return 'tan';return 'deep';}
-function nearestHair(r,g,b){
- const pal={black:[26,20,18],darkbrown:[43,37,34],brown:[90,58,34],auburn:[107,46,31],blonde:[198,161,91],gray:[138,134,128]};
- let best='darkbrown',bd=1e9;
- Object.keys(pal).forEach(k=>{const p=pal[k],d=(p[0]-r)**2+(p[1]-g)**2+(p[2]-b)**2;if(d<bd){bd=d;best=k;}});
- const L=0.299*r+0.587*g+0.114*b;
- if(L<40)return 'black';
- return best;
-}
-function faceShapeFromBox(w,h,jaw,cheek){
- if(!w||!h)return 'oval';
- const ar=h/w;
- if(ar>=1.22)return 'long';
- if(ar<=0.95)return 'round';
- if(jaw&&cheek&&jaw>=cheek*0.98&&ar<1.12)return 'square';
- return 'oval';
-}
-function guessLookFromCanvas(c){
- try{
-  const src=document.createElement('canvas');src.width=64;src.height=64;const x=src.getContext('2d');
-  x.drawImage(c,0,0,64,64);const data=x.getImageData(0,0,64,64).data;
-  let sr=0,sg=0,sb=0,sn=0,minX=64,maxX=0,minY=64,maxY=0;
-  let jawW=0,cheekW=0,jawN=0,cheekN=0;
-  for(let y=16;y<52;y++)for(let p=14;p<50;p++){
-    const i=(y*64+p)*4,r=data[i],g=data[i+1],b=data[i+2];
-    if(!isSkinPix(r,g,b))continue;
-    sr+=r;sg+=g;sb+=b;sn++;
-    if(p<minX)minX=p;if(p>maxX)maxX=p;if(y<minY)minY=y;if(y>maxY)maxY=y;
-    if(y>=36&&y<=48){jawW+=1;jawN++;}
-    if(y>=24&&y<=32){cheekW+=1;cheekN++;}
-  }
-  let hr=0,hg=0,hb=0,hn=0,left=0,right=0;
-  for(let y=1;y<16;y++)for(let p=10;p<54;p++){
-    const i=(y*64+p)*4,r=data[i],g=data[i+1],b=data[i+2],L=0.299*r+0.587*g+0.114*b;
-    if(isSkinPix(r,g,b)&&L>90)continue;
-    if(L>200)continue;
-    hr+=r;hg+=g;hb+=b;hn++;
-    if(p<32)left++;else right++;
-  }
-  const skin=sn?skinToneFromRgb(sr/sn,sg/sn,sb/sn):'warm';
-  const hairColor=hn?nearestHair(hr/hn,hg/hn,hb/hn):'darkbrown';
-  let hairStyle='short';
-  if(hn<40)hairStyle='buzz';
-  else if(hn>180&&Math.abs(left-right)<hn*0.08)hairStyle='curly';
-  else if(hn>30&&(left>right*1.6||right>left*1.6))hairStyle='side';
-  const faceShape=faceShapeFromBox(maxX-minX,maxY-minY,jawN?jawW/jawN:0,cheekN?cheekW/cheekN:0);
-  return {skin,hairColor,hairStyle,faceShape};
- }catch(e){return {skin:'warm',hairColor:'darkbrown',hairStyle:'short',faceShape:'oval'};}
-}
-window.DGLook={skinToneFromRgb,nearestHair,faceShapeFromBox,suggestMealSlot,isSkinPix};
+window.DGLook={suggestMealSlot,faceStore,saveFaceStore,tuneFace};
+
 window.dgMountAvatar=function(){const el=typeof document!=='undefined'&&document.querySelector('#avatarSlot');if(!el||!window.DGAvatar)return;
  const g=el.dataset.ghost;DGAvatar.mount(el,{kg:+el.dataset.kg,ghostKg:g&&+g<=+el.dataset.kg-0.1?+g:null,idle:+el.dataset.idle});};
 // boot() is in index.html after auth.js loads
