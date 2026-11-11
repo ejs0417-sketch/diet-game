@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.5 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달)
-const VERSION='0.4.5', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.6 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달)
+const VERSION='0.4.6', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
@@ -17,7 +17,7 @@ const ACH=[
  ['검진 등록','건강검진 결과를 처음 저장했을 때',20,'🏥']];
 const DERIVED=new Set(['quest','weekly_weight','warning']);
 
-let logDate=null,raw=load(), settings=Object.assign({goal:95,month:109,vitamins:['종합비타민'],favMenus:[]},JSON.parse(localStorage.getItem(SKEY)||'{}')), tab='home', logKind='meal', mealKind='저녁';
+let logDate=null,raw=load(), settings=Object.assign({goal:95,month:109,vitamins:['종합비타민'],favMenus:[],leftovers:[]},JSON.parse(localStorage.getItem(SKEY)||'{}')), tab='home', logKind='meal', mealKind='저녁';
 function load(){const s=localStorage.getItem(KEY);return s?JSON.parse(s):[];}
 function ensureSeed(){if(!raw.length){raw=SEED.map(withId);localStorage.setItem(KEY,JSON.stringify(raw));}}
 function save(){localStorage.setItem(KEY,JSON.stringify(raw));if(window.DGAuth)DGAuth.schedulePush();}

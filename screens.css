@@ -126,3 +126,8 @@ body.gate main,body.gate nav{display:none}
 .fav-chips{margin-bottom:4px}
 .fav-chips .chip{background:#fff}
 .health-sheet .segmented[data-seg=por]{grid-template-columns:repeat(4,1fr)}
+
+.priv-line{font-size:11px;line-height:1.45;color:var(--ink-500,#5b6178);background:#F3F5FB;border-radius:10px;padding:8px 10px;margin:0 0 10px}
+.leftover-block{margin-top:8px}
+.lo-card{margin:0 0 8px;padding:12px}
+.eaten-seg{grid-template-columns:repeat(5,1fr)}

@@ -60,7 +60,8 @@ const DGAuth=(function(){
   function profileOf(){
     const u=session&&session.user;
     const favs=Array.isArray(settings.favMenus)?settings.favMenus.map(f=>({name:f.name,dishId:f.dishId||'',count:+f.count||1,last:f.last||'',store:f.store||'',kcal:f.kcal,protein:f.protein,carbs:f.carbs,fat:f.fat,sodium:f.sodium})):[];
-    return {goal:settings.goal,month:settings.month,height:HEIGHT,display_name:(u&&(u.name||u.email))||'',vitamins:Array.isArray(settings.vitamins)?settings.vitamins.slice():['종합비타민'],favMenus:favs};
+    const leftovers=(typeof DGDelivery!=='undefined'&&DGDelivery.mergeLeftovers?DGDelivery.mergeLeftovers(settings.leftovers||[],[]):(Array.isArray(settings.leftovers)?settings.leftovers:[])).map(x=>(typeof DGDelivery!=='undefined'&&DGDelivery.sanitizeLeftover?DGDelivery.sanitizeLeftover(x):x)).filter(Boolean);
+    return {goal:settings.goal,month:settings.month,height:HEIGHT,display_name:(u&&(u.name||u.email))||'',vitamins:Array.isArray(settings.vitamins)?settings.vitamins.slice():['종합비타민'],favMenus:favs,leftovers};
   }
   function applyProfile(p){
     if(!p||typeof p!=='object')return;
@@ -73,6 +74,10 @@ const DGAuth=(function(){
     if(Array.isArray(p.favMenus)){
       const local=Array.isArray(settings.favMenus)?settings.favMenus:[];
       settings.favMenus=(typeof DGDelivery!=='undefined'&&DGDelivery.mergeFavs)?DGDelivery.mergeFavs(local,p.favMenus):p.favMenus.slice();
+    }
+    if(Array.isArray(p.leftovers)){
+      const local=Array.isArray(settings.leftovers)?settings.leftovers:[];
+      settings.leftovers=(typeof DGDelivery!=='undefined'&&DGDelivery.mergeLeftovers)?DGDelivery.mergeLeftovers(local,p.leftovers):p.leftovers.slice();
     }
     localStorage.setItem(SKEY,JSON.stringify(settings));
   }
@@ -394,7 +399,7 @@ const DGAuth=(function(){
     clearSession();
     localStorage.removeItem(GATEKEY);
     if(wipe){
-      raw=[]; settings={goal:95,month:109,vitamins:['종합비타민'],favMenus:[]};
+      raw=[]; settings={goal:95,month:109,vitamins:['종합비타민'],favMenus:[],leftovers:[]};
       localStorage.removeItem(KEY); localStorage.removeItem(SKEY);
     }
     toast(wipe?'계정을 삭제하고 폰 기록도 지웠어요':'계정을 삭제했어요. 이 폰 기록은 남아 있어요.');

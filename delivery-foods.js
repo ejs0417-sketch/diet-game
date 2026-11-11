@@ -1,4 +1,4 @@
-// 다이어트 게임 0.4.5 — 배달 메뉴 영양 대략치 (기기 안 참고용)
+// 다이어트 게임 0.4.6 — 배달 메뉴 영양 대략치 (기기 안 참고용)
 (function(root){
 const SOURCE="값은 표기된 단위(한마리·1판·1인분 등)의 대략치예요. 주로 식품의약품안전처 식품영양성분 데이터베이스의 외식·분식·패스트푸드 대표값을 참고했고, 없는 항목은 같은 분류의 대표 레시피로 환산했어요. 브랜드·양념·양에 따라 달라질 수 있어요.";
 const FOODS=[
@@ -19,7 +19,8 @@ const FOODS=[
 {"id":"orig-w","name":"오리지날 치킨 한마리","aliases":["교촌오리지날","오리지날콤보"],"cat":"치킨","unit":"한마리","kcal":1880,"protein":118,"carbs":80,"fat":108,"sodium":2500,"src":"같은 분류 대표값으로 환산한 대략치"},
 {"id":"fried-h","name":"후라이드 치킨 반마리","aliases":["후라이드 반마리","반마리 후라이드"],"cat":"치킨","unit":"반마리","kcal":900,"protein":60,"carbs":35,"fat":55,"sodium":1200,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"yang-h","name":"양념치킨 반마리","aliases":["양념 반마리","반마리 양념"],"cat":"치킨","unit":"반마리","kcal":1000,"protein":55,"carbs":70,"fat":55,"sodium":1400,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
-{"id":"half-half","name":"반반치킨","aliases":["후라이드양념반반","반반"],"cat":"치킨","unit":"반마리","kcal":1900,"protein":115,"carbs":105,"fat":110,"sodium":2600,"src":"같은 분류 대표값으로 환산한 대략치"},
+{"id":"half-half","name":"반반치킨","aliases":["후라이드양념반반","반반","반반치킨(후라이드+양념)","후라이드+양념","후라이드양념","뼈반반","반반 치킨"],"cat":"치킨","unit":"반마리","kcal":1900,"protein":115,"carbs":105,"fat":110,"sodium":2600,"src":"같은 분류 대표값으로 환산한 대략치"},
+{"id":"half-sunsal","name":"순살 반반치킨","aliases":["순살반반","반반치킨 순살","순살 반반"],"cat":"치킨","unit":"한마리","kcal":2000,"protein":125,"carbs":100,"fat":112,"sodium":2500,"src":"같은 분류 대표값으로 환산한 대략치"},
 {"id":"wing-8","name":"치킨윙 8조각","aliases":["치킨윙","윙봉","윙"],"cat":"치킨","unit":"1인분","kcal":720,"protein":42,"carbs":20,"fat":52,"sodium":980,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"leg-4","name":"치킨다리 4조각","aliases":["치킨다리","닭다리","통다리","자메이카통다리"],"cat":"치킨","unit":"1인분","kcal":800,"protein":50,"carbs":18,"fat":58,"sodium":900,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"piece-f","name":"후라이드 치킨 한 조각","aliases":["후라이드 한조각","치킨 한조각"],"cat":"치킨","unit":"1인분","kcal":220,"protein":15,"carbs":8,"fat":14,"sodium":280,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
@@ -155,14 +156,21 @@ const FOODS=[
 {"id":"poke-salmon","name":"연어포케","aliases":["포케 연어","연어포케볼"],"cat":"샐러드포케","unit":"1인분","kcal":550,"protein":32,"carbs":60,"fat":16,"sodium":800,"src":"같은 분류 대표값으로 환산한 대략치"},
 {"id":"poke-tuna","name":"참치포케","aliases":["포케 참치","참치포케볼"],"cat":"샐러드포케","unit":"1인분","kcal":520,"protein":34,"carbs":58,"fat":14,"sodium":850,"src":"같은 분류 대표값으로 환산한 대략치"},
 {"id":"breast-sal","name":"닭가슴살샐러드","aliases":["닭샐러드","닭가슴살 샐러드"],"cat":"샐러드포케","unit":"1인분","kcal":350,"protein":40,"carbs":15,"fat":10,"sodium":700,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
+{"id":"sousvide-sal","name":"수비드닭가슴살 샐러드","aliases":["수비드 닭가슴살 샐러드","수비드닭가슴살샐러드","수비드샐러드"],"cat":"샐러드포케","unit":"1인분","kcal":390,"protein":42,"carbs":16,"fat":14,"sodium":820,"src":"같은 분류 대표값으로 환산한 대략치"},
+{"id":"today-sal","name":"Today 샐러드","aliases":["투데이샐러드","오늘의샐러드","투데이 샐러드","Today샐러드"],"cat":"샐러드포케","unit":"1인분","kcal":280,"protein":16,"carbs":22,"fat":12,"sodium":640,"src":"같은 분류 대표값으로 환산한 대략치"},
 {"id":"caesar","name":"시저샐러드","aliases":["シーザー","시저 샐러드"],"cat":"샐러드포케","unit":"1인분","kcal":400,"protein":15,"carbs":18,"fat":30,"sodium":900,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"club-sand","name":"클럽샌드위치","aliases":["클럽 샌드위치","샌드위치"],"cat":"샐러드포케","unit":"1인분","kcal":550,"protein":28,"carbs":45,"fat":26,"sodium":1100,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"salad-wrap","name":"샐러드랩","aliases":["치킨랩","랩샌드위치"],"cat":"샐러드포케","unit":"1인분","kcal":400,"protein":22,"carbs":40,"fat":16,"sodium":800,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"yogurt-bowl","name":"그릭요거트볼","aliases":["요거트볼","그릭요거트"],"cat":"샐러드포케","unit":"1인분","kcal":320,"protein":18,"carbs":35,"fat":10,"sodium":150,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
+{"id":"sulbing-wm","name":"수박화채설빙","aliases":["수박화채 설빙","수박설빙","수박화채"],"cat":"디저트음료","unit":"1인분","kcal":620,"protein":10,"carbs":110,"fat":14,"sodium":160,"src":"같은 분류 대표값으로 환산한 대략치"},
+{"id":"sulbing-melon","name":"요거치즈메론설빙","aliases":["요거치즈메론 설빙","메론설빙","요거트메론설빙","치즈메론설빙"],"cat":"디저트음료","unit":"1인분","kcal":680,"protein":14,"carbs":100,"fat":22,"sodium":200,"src":"같은 분류 대표값으로 환산한 대략치"},
+{"id":"sulbing-injeolmi","name":"인절미설빙","aliases":["인절미 설빙","인절미빙수"],"cat":"디저트음료","unit":"1인분","kcal":600,"protein":12,"carbs":105,"fat":14,"sodium":150,"src":"같은 분류 대표값으로 환산한 대략치"},
+{"id":"sulbing-mango","name":"망고설빙","aliases":["망고 설빙","망고빙수"],"cat":"디저트음료","unit":"1인분","kcal":590,"protein":8,"carbs":115,"fat":12,"sodium":140,"src":"같은 분류 대표값으로 환산한 대략치"},
+{"id":"sulbing-pat","name":"팥빙수","aliases":["팥설빙","전통팥빙수"],"cat":"디저트음료","unit":"1인분","kcal":540,"protein":10,"carbs":100,"fat":10,"sodium":120,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"cola-500","name":"콜라 500ml","aliases":["콜라500","코카콜라500"],"cat":"디저트음료","unit":"1개","kcal":210,"protein":0,"carbs":54,"fat":0,"sodium":20,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"zero-500","name":"제로콜라 500ml","aliases":["제로콜라500"],"cat":"디저트음료","unit":"1개","kcal":0,"protein":0,"carbs":0,"fat":0,"sodium":30,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"cider-500","name":"사이다 500ml","aliases":["사이다500"],"cat":"디저트음료","unit":"1개","kcal":200,"protein":0,"carbs":52,"fat":0,"sodium":25,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
-{"id":"americano","name":"아이스아메리카노","aliases":["아메리카노","아이스 아메리카노"],"cat":"디저트음료","unit":"1개","kcal":10,"protein":1,"carbs":1,"fat":0,"sodium":10,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
+{"id":"americano","name":"아이스아메리카노","aliases":["아메리카노","아이스 아메리카노","아메리카노 Ice","아메리카노Ice","Ice아메리카노","아이스아메리카노 Ice"],"cat":"디저트음료","unit":"1개","kcal":10,"protein":1,"carbs":1,"fat":0,"sodium":10,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"latte","name":"카페라떼","aliases":["라떼","아이스라떼"],"cat":"디저트음료","unit":"1개","kcal":150,"protein":8,"carbs":12,"fat":8,"sodium":100,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"milktea","name":"밀크티","aliases":["버블티","진주밀크티"],"cat":"디저트음료","unit":"1개","kcal":280,"protein":4,"carbs":40,"fat":10,"sodium":80,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"cheesecake","name":"치즈케이크","aliases":["뉴욕치즈케이크"],"cat":"디저트음료","unit":"1개","kcal":350,"protein":6,"carbs":32,"fat":22,"sodium":250,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
