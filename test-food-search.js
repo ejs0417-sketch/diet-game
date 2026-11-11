@@ -1,4 +1,4 @@
-// 0.4.8 대표 메뉴 검색 단위 테스트
+// 0.4.9 대표 메뉴 검색 단위 테스트
 const assert = require('assert');
 const foods = require('./delivery-foods.js');
 const search = require('./food-search.js');
@@ -48,3 +48,13 @@ assert(!kimchi.some(n=>n.includes('고추마요')||n.includes('설빙')||n.inclu
 assert.strictEqual(kimchi[0], '김치찌개', '김치 첫 결과 '+kimchi[0]);
 
 console.log('food-search tests ok', {짜장:names('짜장').slice(0,3), 초성:names('ㄱㅊㅉㄱ').slice(0,3), 치킨:names('치킨').slice(0,5)});
+
+// 0.4.9: '치킨' 검색에 샐러드랩이 섞이지 않고, 대표 치킨이 먼저
+{
+  const n=names('치킨');
+  assert.ok(!n.includes('샐러드랩'), "'치킨' 결과에 샐러드랩이 없어야 함: "+n.join(', '));
+  assert.ok(/치킨/.test(n[0]) && n[0].includes('후라이드'), "'치킨' 첫 결과는 대표 치킨: "+n[0]);
+  has('치킨랩', h=>h.item.id==='salad-wrap', "'치킨랩'은 여전히 샐러드랩을 찾음");
+  has('랩', h=>h.item.id==='salad-wrap', "'랩'은 샐러드랩");
+}
+console.log('0.4.9 food-search extra tests ok');

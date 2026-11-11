@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.8 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색)
-const VERSION='0.4.8', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.9 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색)
+const VERSION='0.4.9', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
@@ -470,7 +470,7 @@ const HAIR_SWATCH={black:'#1a1412',darkbrown:'#2b2522',brown:'#5a3a22',auburn:'#
 function slider(key,label,val){
  return `<label class="face-slider"><span class="label">${label}</span><input class="range" type="range" min="0" max="100" step="1" value="${Math.round((+val||0)*100)}" oninput="tuneFace('${key}',this.value/100)"></label>`;
 }
-function makeMe(C){const base=meBase??+C.avatarW.toFixed(1),goal=settings.goal,v=pvKg??base,st=faceStore();
+function makeMe(C){const avMode=(window.DGAvatar&&DGAvatar.mode)||'glb';const base=meBase??+C.avatarW.toFixed(1),goal=settings.goal,v=pvKg??base,st=faceStore();
  const lo=86;
  const hairBtns=Object.keys(HAIR_STYLE_LABEL).map(k=>`<button type="button" class="chip${st.hairStyle===k?' on':''}" onclick="tuneFace('hairStyle','${k}')">${HAIR_STYLE_LABEL[k]}</button>`).join('');
  const beardBtns=Object.keys(BEARD_LABEL).map(k=>`<button type="button" class="chip${st.beard===k?' on':''}" onclick="tuneFace('beard','${k}')">${BEARD_LABEL[k]}</button>`).join('');
@@ -481,10 +481,12 @@ function makeMe(C){const base=meBase??+C.avatarW.toFixed(1),goal=settings.goal,v
  <div style="margin:12px 0"><div class="avatar-frame" id="avatarSlot" style="height:330px" data-kg="${v}" data-idle="0.25"><img class="fallback" src="char.png" alt="캐릭터"><div class="pedestal"></div><div class="avcap" id="pvCap">${pvLabel(base,v)}</div></div></div>
  <div class="rowx" style="margin-bottom:6px"><label class="field"><span class="label">키(cm) 🔒</span><input class="input" type="number" value="${HEIGHT}" disabled></label>
  <label class="field"><span class="label">현재 체중(kg)</span><input class="input" id="meW" type="number" step="0.1" value="${base}" onchange="setBase(this.value)"></label></div>
- <div class="muted" style="margin-bottom:12px">키는 186cm로 고정이고, 몸매는 체중에 따라 Slim 모프로 바뀌어요. 홈 아바타는 최근 7일 체중 평균(${C.avatarW.toFixed(1)}kg)을 따라가요.</div>
+ <div class="muted" style="margin-bottom:12px">키는 186cm로 고정이고, 체형은 시작 체중에서 목표 체중까지의 진행도에 따라 '지금 체형'에서 '목표 체형'으로 바뀌어요(50%부터 서서히). 홈 아바타는 최근 7일 체중 평균(${C.avatarW.toFixed(1)}kg)을 따라가요.</div>
  <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="color:var(--ink-900)">목표 체형 미리보기</b><span class="num" style="font-weight:800;color:var(--coral-600)">${(+v).toFixed(1)}kg</span></div>
  <input class="range" id="pv" type="range" min="${lo}" max="${Math.max(base,lo+1)}" step="0.5" value="${v}" oninput="previewKg(this.value)">
  <div class="rowx" style="margin-bottom:14px"><button type="button" class="btn-secondary btn-sm" onclick="previewKg(${base})">지금 ${base}kg</button><button type="button" class="btn-secondary btn-sm" style="border-color:var(--mint-500);color:var(--mint-700);background:var(--mint-50)" onclick="previewKg(${goal})">목표 ${goal}kg</button><button type="button" class="btn-secondary btn-sm" onclick="previewKg(86)">86kg</button></div>
+ <b style="color:var(--ink-900)">캐릭터 종류</b>
+ <div class="look-picks" style="margin:6px 0 12px"><button type="button" class="chip${avMode==='glb'?' on':''}" onclick="setAvatarMode('glb')">내 캐릭터(3D 모델)</button><button type="button" class="chip${avMode==='proc'?' on':''}" onclick="setAvatarMode('proc')">직접 다듬기 캐릭터</button></div>
  <b style="color:var(--ink-900)">사진으로 내 얼굴 모델링</b>
  <div class="muted" style="margin:6px 0 8px">정면 사진을 찍거나 고르면, 이 폰 안에서 이목구비를 읽고 3D 캐릭터를 만들어요. 사진은 저장하지 않아요.</div>
  <div style="display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap">
@@ -510,14 +512,16 @@ function makeMe(C){const base=meBase??+C.avatarW.toFixed(1),goal=settings.goal,v
    <div class="look-picks" style="margin-top:8px">${beardBtns}</div></div>
  </details>
  <div class="muted">🔒 사진은 분석이 끝나면 버려요. 남는 것은 얼굴 숫자값뿐이에요. 이 값은 계정과 함께 동기화될 수 있고, 사진은 올리지 않아요.</div></div>`;}
-function tuneFace(key,val){if(!saveFaceStore({[key]:val}))return;}
+function setAvatarMode(m){if(!window.DGAvatar)return;DGAvatar.setMode(m);render();}
+function useProcAvatar(){if(window.DGAvatar&&DGAvatar.mode!=='proc'){DGAvatar.setMode('proc');toast('직접 다듬기 캐릭터로 바꿨어요');}}
+function tuneFace(key,val){if(!saveFaceStore({[key]:val}))return;useProcAvatar();}
 function pvLabel(base,v){const d=+(base-v).toFixed(1);return d>0?`지금 ${(+base).toFixed(1)}kg → 미리보기 ${(+v).toFixed(1)}kg (−${d.toFixed(1)}kg)`:`지금 ${(+base).toFixed(1)}kg`;}
 function previewKg(v){v=+v;pvKg=v;const base=meBase??+compute().avatarW.toFixed(1);const r=$('#pv');if(r)r.value=v;const c=$('#pvCap');if(c)c.textContent=pvLabel(base,v);
  const kgEl=document.querySelector('#makeMe .num[style*="coral"]');if(kgEl)kgEl.textContent=v.toFixed(1)+'kg';
  if(window.DGAvatar)DGAvatar.setWeight(v);}
 function setBase(v){v=+v;if(!(v>=40&&v<=250))return;meBase=v;pvKg=v;render();}
 function resetFace(){if(!confirm('캐릭터 얼굴을 기본값으로 되돌릴까요?'))return;
- if(!saveFaceStore(window.DGFace?DGFace.DEFAULTS:{}))return;toast('기본 캐릭터로 바꿨어요');render();}
+ if(!saveFaceStore(window.DGFace?DGFace.DEFAULTS:{}))return;if(window.DGAvatar)DGAvatar.setMode('glb');toast('기본 캐릭터로 바꿨어요');render();}
 function openAnalyze(msg){
  let el=$('#facePane');if(!el){el=document.createElement('div');el.id='facePane';el.className='health-pane';document.body.appendChild(el);}
  el.innerHTML=`<div class="health-sheet"><div class="card"><h3>얼굴을 보고 있어요</h3><p class="muted">${esc(msg||((window.DGFace&&DGFace.PRIVACY)||'사진은 이 폰 안에서만 보고, 분석이 끝나면 버려요.'))}</p></div></div>`;
@@ -530,6 +534,7 @@ async function applyFaceImage(img){
   if(!window.DGFace||!DGFace.analyze)throw new Error('no-face-mod');
   const params=await DGFace.analyze(img);
   if(!saveFaceStore(params))return;
+  if(window.DGAvatar)DGAvatar.setMode('proc');
   toast('내 캐릭터를 만들었어요. 아래 칸에서 다듬을 수 있어요');
   render();
  }catch(e){
@@ -601,6 +606,6 @@ function closeCam(keep){
 window.DGLook={suggestMealSlot,faceStore,saveFaceStore,tuneFace};
 
 window.dgMountAvatar=function(){const el=typeof document!=='undefined'&&document.querySelector('#avatarSlot');if(!el||!window.DGAvatar)return;
- const g=el.dataset.ghost;DGAvatar.mount(el,{kg:+el.dataset.kg,ghostKg:g&&+g<=+el.dataset.kg-0.1?+g:null,idle:+el.dataset.idle});};
+ const g=el.dataset.ghost;DGAvatar.mount(el,{kg:+el.dataset.kg,ghostKg:g&&+g<=+el.dataset.kg-0.1?+g:null,idle:+el.dataset.idle,start:START_W,goal:settings.goal});};
 // boot() is in index.html after auth.js loads
 try{mealKind=suggestMealSlot();}catch(e){}

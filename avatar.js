@@ -1,4 +1,5 @@
-// 다이어트 게임 0.4.7 — 파라미터로 조각한 3D 캐릭터 (three.js, 사진은 텍스처로 쓰지 않음)
+// 다이어트 게임 0.4.9 — 기본은 승인된 시안에서 만든 GLB 3D 캐릭터(현재 체형/목표 체형 2개를 체중 진행도로 크로스페이드).
+// GLB를 못 불러오거나 '직접 다듬기' 모드면 0.4.7 절차적 캐릭터(파라미터로 조각, 사진은 텍스처로 쓰지 않음)로 폴백한다.
 // 키 186cm 고정. 체중 113~86kg 사이 7개 기준 단계를 연속 보간해서 배·허리·팔·다리·볼 두께가 바뀐다.
 import * as T from './vendor/three.custom.min.js';
 
@@ -11,6 +12,16 @@ export function shapeOf(kg){
   return 0;
 }
 const L=(a,b,f)=>a+(b-a)*f;
+// ---- 0.4.9 GLB 캐릭터 ----
+const GLB_URL={cur:'assets/avatar/char-current-0.4.9.glb',goal:'assets/avatar/char-goal-0.4.9.glb'};
+const MODE_KEY='dg_avatar_mode'; // 'glb'(기본) | 'proc'(0.4.7 직접 다듬기 캐릭터)
+const clamp01=x=>Math.max(0,Math.min(1,x));
+const smooth=x=>{x=clamp01(x);return x*x*(3-2*x);};
+// 진행도 0(시작 체중)~1(목표 체중). 0~50%는 현재 체형, 50%를 넘으면 목표 체형으로 서서히 바뀐다.
+export function progressOf(kg,start=113,goal=95){const d=start-goal;if(!(d>0)||!(kg>0))return 0;return clamp01((start-kg)/d);}
+export function blendOf(p){return p<=.5?0:smooth((p-.5)/.5);}
+export function readMode(){try{return localStorage.getItem(MODE_KEY)==='proc'?'proc':'glb';}catch(e){return 'glb';}}
+
 const LEGUP=.07;
 const COL={skin:0xf6c9a4,shirt:0x8fdcbc,star:0xf37b72,shorts:0x8e949a,shoe:0xffffff,sole:0xdde3e0,hair:0x2b2522,eye:0x2a211d,blush:0xf7a39b,ped:0xbfe9d4,pedTop:0xd8f3e6,lip:0xc45c5c};
 const SKIN_HEX={light:0xf8d7c4,warm:0xf6c9a4,medium:0xc6865b,tan:0xa0643c,deep:0x6b3d26};
@@ -40,7 +51,8 @@ function normalizeLook(o){
 function lookFromStore(){return normalizeLook(Object.assign({},LOOK_DEF,readFaceStore()||{}));}
 
 let renderer=null,scene,camera,root,body=null,ghost=null,failed=false,gScene,gRoot,gDepth,gColor;
-let state={kg:113,ghostKg:null},look=Object.assign({},LOOK_DEF);
+let state={kg:113,ghostKg:null,start:113,goal:95},look=Object.assign({},LOOK_DEF);
+let mode=readMode(),glb={status:'idle',cur:null,goal:null},glbRoot=null,gGlb=null,glbShown=false,phase=0,swayBase=0;
 let host=null,rotY=0.35,drag=null,lastT=0,raf=0,idleSpeed=0.35,ro=null,dirty=true;
 const mats={};
 let TOON_G=null;
@@ -264,11 +276,60 @@ function buildBody(f,isGhost,lk){
 }
 function disposeTree(o){o.traverse(n=>{if(n.geometry)n.geometry.dispose();});}
 
+function glbActive(){return mode==='glb'&&glb.status==='ready';}
+function loadGlbs(){
+  if(glb.status!=='idle'||failed)return;glb.status='loading';
+  const ld=new T.GLTFLoader();
+  const one=u=>new Promise((res,rej)=>{const to=setTimeout(()=>rej(new Error('timeout')),25000);
+    ld.load(u,g=>{clearTimeout(to);res(g.scene);},undefined,e=>{clearTimeout(to);rej(e);});});
+  Promise.all([one(GLB_URL.cur),one(GLB_URL.goal)]).then(([c,g])=>{
+    for(const o of [c,g])o.traverse(n=>{if(n.isMesh){
+      const m=n.material,map=m&&m.map;if(map){map.colorSpace=T.SRGBColorSpace;map.anisotropy=4;}
+      // 텍스처에 이미 명암이 구워져 있어서 조명 없이(unlit) 그대로 보여준다
+      n.material=new T.MeshBasicMaterial({map:map||null,color:0xffffff});n.frustumCulled=false;}});
+    glb.cur=c;glb.goal=g;glb.status='ready';rebuild();
+  }).catch(e=>{glb.status='failed';try{console.warn('GLB 로드 실패, 절차적 캐릭터로 대체',e);}catch(_){}rebuild();});
+}
+function setOpacity(o,op){o.traverse(n=>{if(n.isMesh){const m=n.material,tr=op<.999;
+  m.transparent=tr;m.opacity=op;m.depthWrite=!tr;m.needsUpdate=true;}});}
+function glbShade(){ // 진행도에 맞춰 두 모델 크로스페이드 + 약간의 스케일 보간
+  const p=progressOf(state.kg,state.start,state.goal),t=blendOf(p);
+  const cs=(1-.05*Math.min(1,p*2))*(1-.03*t),gs=.965+.035*t;
+  glb.cur.visible=t<.999;glb.goal.visible=t>.001;
+  glb.cur.userData.sx=cs;glb.goal.userData.sx=gs;
+  glb.cur.renderOrder=1;glb.goal.renderOrder=2;
+  glb.cur.traverse(n=>{n.renderOrder=1;});glb.goal.traverse(n=>{n.renderOrder=2;});
+  setOpacity(glb.cur,t<.001?1:1-t);setOpacity(glb.goal,t>.999?1:t);
+  applyGlbPose(0);
+  // 예측 고스트: 가까운 쪽 모델을 초록 반투명으로
+  if(gGlb){gRoot.remove(gGlb);gGlb=null;}
+  if(state.ghostKg!=null){const gp=progressOf(state.ghostKg,state.start,state.goal);
+    if(gp>p+.01){const src=blendOf(gp)>.5?glb.goal:glb.cur;gGlb=src.clone(true);
+      gGlb.visible=true;gGlb.userData.sx=src===glb.goal?.965+.035*blendOf(gp):(1-.05*Math.min(1,gp*2))*(1-.03*blendOf(gp));
+      gGlb.traverse(n=>{if(n.isMesh)n.frustumCulled=false;});gRoot.add(gGlb);}}
+  applyGlbPose(0);
+}
+function applyGlbPose(breath){ // breath: -1~1 숨쉬기
+  for(const o of [glb&&glb.cur,glb&&glb.goal,gGlb]){if(!o)continue;
+    const sx=o.userData.sx||1;o.scale.set(sx*(1-.004*breath),1+.008*breath,sx*(1-.004*breath));}
+}
 function rebuild(){if(!scene)return;
-  if(body){root.remove(body);disposeTree(body);} body=buildBody(shapeOf(state.kg),false,look);root.add(body);
+  if(body){root.remove(body);disposeTree(body);body=null;}
+  if(glbRoot){root.remove(glbRoot);glbRoot=null;}
   if(ghost){gRoot.remove(ghost);disposeTree(ghost);ghost=null;}
-  if(state.ghostKg!=null&&shapeOf(state.ghostKg)<shapeOf(state.kg)-.01){ghost=buildBody(shapeOf(state.ghostKg),true,look);gRoot.add(ghost);}
-  dirty=true;}
+  if(gGlb){gRoot.remove(gGlb);gGlb=null;}
+  mode=readMode();
+  if(mode==='glb'&&glb.status==='idle')loadGlbs();
+  if(glbActive()){
+    glbRoot=new T.Group();glbRoot.add(glb.cur);glbRoot.add(glb.goal);root.add(glbRoot);glbShown=true;glbShade();
+  }else if(mode==='proc'||glb.status==='failed'){
+    glbShown=false;
+    body=buildBody(shapeOf(state.kg),false,look);root.add(body);
+    if(state.ghostKg!=null&&shapeOf(state.ghostKg)<shapeOf(state.kg)-.01){ghost=buildBody(shapeOf(state.ghostKg),true,look);gRoot.add(ghost);}
+  }else glbShown=false; // 불러오는 중: char.png 임시 이미지를 보여줌
+  syncFallback();dirty=true;}
+function syncFallback(){if(!host)return;const fb=host.querySelector('.fallback');
+  if(fb)fb.style.display=(body||glbShown)?'none':'';}
 
 function init(){if(renderer||failed)return !failed;
   try{const cv=document.createElement('canvas');const gl=cv.getContext('webgl2')||cv.getContext('webgl');if(!gl)throw new Error('no webgl');
@@ -287,8 +348,10 @@ function init(){if(renderer||failed)return !failed;
   renderer.autoClear=false;
   const ped=new T.Mesh(new T.CylinderGeometry(.5,.54,.08,40),mat('ped',{color:COL.ped}));ped.position.y=-.04;scene.add(ped);
   const top=new T.Mesh(new T.CircleGeometry(.5,40),mat('pedTop',{color:COL.pedTop}));top.rotation.x=-Math.PI/2;top.position.y=.001;scene.add(top);
-  cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,r:rotY};cv.setPointerCapture(e.pointerId);cv.style.cursor='grabbing';});
-  cv.addEventListener('pointermove',e=>{if(drag){rotY=drag.r+(e.clientX-drag.x)*.012;dirty=true;}});
+  const sh=new T.Mesh(new T.CircleGeometry(.36,32),new T.MeshBasicMaterial({color:0x3f8f77,transparent:true,opacity:.22,depthWrite:false}));
+  sh.rotation.x=-Math.PI/2;sh.position.y=.004;sh.scale.set(1.25,1,.8);scene.add(sh);
+  cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,r:rotY};swayBase=rotY;cv.setPointerCapture(e.pointerId);cv.style.cursor='grabbing';});
+  cv.addEventListener('pointermove',e=>{if(drag){rotY=drag.r+(e.clientX-drag.x)*.012;swayBase=rotY;dirty=true;}});
   const up=()=>{drag=null;cv.style.cursor='grab';};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();else start();});
   look=lookFromStore();
@@ -301,11 +364,17 @@ function frame(){if(!host)return;
       camera.position.set(0,.95,Math.max(distH,distW)*1.02);camera.lookAt(0,.86,0);camera.updateProjectionMatrix();dirty=true;}}
 }
 function loop(t){raf=0;if(!host||!host.isConnected||document.hidden){return;}
+  if(glbShown&&idleSpeed&&!drag&&lastT&&t-lastT<30){raf=requestAnimationFrame(loop);return;} // 대기 애니메이션은 30fps 이하로
   const dt=lastT?Math.min(.05,(t-lastT)/1000):0;lastT=t;
-  if(!drag&&idleSpeed){rotY+=dt*idleSpeed;dirty=true;}
+  if(glbShown){ // GLB: 얼굴이 잘 보이게 살짝 좌우로 흔들리는 대기 동작 + 숨쉬기
+    if(idleSpeed&&!drag){phase+=dt;dirty=true;}
+    const sway=idleSpeed&&!drag?Math.sin(phase*idleSpeed*1.7)*.5:0;
+    rotY=swayBase+sway;
+    applyGlbPose(idleSpeed?Math.sin(phase*2.2):0);
+  }else if(!drag&&idleSpeed){rotY+=dt*idleSpeed;dirty=true;}
   frame();root.rotation.y=rotY;
   if(dirty){renderer.clear();renderer.render(scene,camera);
-    if(ghost){gRoot.rotation.y=rotY;renderer.clearDepth();gScene.overrideMaterial=gDepth;renderer.render(gScene,camera);gScene.overrideMaterial=gColor;renderer.render(gScene,camera);}
+    if(ghost||gGlb){gRoot.rotation.y=rotY;renderer.clearDepth();gScene.overrideMaterial=gDepth;renderer.render(gScene,camera);gScene.overrideMaterial=gColor;renderer.render(gScene,camera);}
     dirty=false;}
   raf=requestAnimationFrame(loop);}
 function start(){if(!raf&&host&&!failed){lastT=0;raf=requestAnimationFrame(loop);}}
@@ -327,7 +396,7 @@ function snapshot(opt){
   }
   renderer.setClearColor(0x000000,0);
   renderer.clear();renderer.render(scene,camera);
-  if(ghost){renderer.clearDepth();gScene.overrideMaterial=gDepth;renderer.render(gScene,camera);gScene.overrideMaterial=gColor;renderer.render(gScene,camera);}
+  if(ghost||gGlb){gRoot.rotation.y=rotY;renderer.clearDepth();gScene.overrideMaterial=gDepth;renderer.render(gScene,camera);gScene.overrideMaterial=gColor;renderer.render(gScene,camera);}
   const url=renderer.domElement.toDataURL('image/png');
   rotY=prev;root.rotation.y=rotY;
   camera.position.copy(prevPos);camera.fov=prevFov;camera.lookAt(0,.86,0);camera.updateProjectionMatrix();
@@ -339,17 +408,24 @@ const api={
   get failed(){return failed;},
   shapeOf,hexNum,normalizeLook,
   mount(el,opt={}){if(!el)return false;if(!init()){el.classList.add('noGL');return false;}
-    host=el;const fb=el.querySelector('.fallback');if(fb)fb.style.display='none';
+    host=el;
     el.appendChild(renderer.domElement);renderer.domElement._w=0;
     idleSpeed=opt.idle??.35;
-    const kg=opt.kg??state.kg,gk=opt.ghostKg??null;if(kg!==state.kg||gk!==state.ghostKg){state.kg=kg;state.ghostKg=gk;rebuild();}
+    if(opt.start>0)state.start=opt.start;if(opt.goal>0)state.goal=opt.goal;
+    state.kg=opt.kg??state.kg;state.ghostKg=opt.ghostKg??null;
+    swayBase=readMode()==='glb'?0:rotY;phase=0;
+    rebuild();
     if(ro)ro.disconnect();if(window.ResizeObserver){ro=new ResizeObserver(()=>{dirty=true;});ro.observe(el);}
     dirty=true;stop();start();return true;},
-  setWeight(kg,ghostKg){if(failed||!scene)return;state.kg=kg;state.ghostKg=ghostKg??null;rebuild();},
+  setWeight(kg,ghostKg){if(failed||!scene)return;state.kg=kg;state.ghostKg=ghostKg??null;if(glbActive()&&glbShown)glbShade();else rebuild();dirty=true;},
+  progressOf,blendOf,
+  get mode(){return readMode();},get glbStatus(){return glb.status;},
+  setMode(m){try{localStorage.setItem(MODE_KEY,m==='proc'?'proc':'glb');}catch(e){}if(!failed&&scene){if(m!=='proc')swayBase=0;rebuild();}},
+  setIdle(v){idleSpeed=v;dirty=true;},
   setFace(){/* 사진은 아바타에 붙이지 않아요 */},
-  setLook(o){look=normalizeLook(Object.assign({},look,o||{}));if(!failed&&scene)rebuild();},
+  setLook(o){look=normalizeLook(Object.assign({},look,o||{}));if(!failed&&scene&&readMode()==='proc')rebuild();},
   getLook(){return Object.assign({},look);},
-  snapshot,setRotation(r){rotY=r;dirty=true;},
+  snapshot,setRotation(r){rotY=r;swayBase=r;dirty=true;},
   SKIN_HEX,HAIR_HEX,FACE_SCALE,LOOK_DEF,
 };
 window.DGAvatar=api;

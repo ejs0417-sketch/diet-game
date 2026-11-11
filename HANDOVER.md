@@ -1,4 +1,4 @@
-# 다이어트 게임 앱 인수인계 (2026-11-11, v0.4.8)
+# 다이어트 게임 앱 인수인계 (2026-11-11, v0.4.9)
 
 ## 1. 개요
 - 준석님(이준석)의 다이어트 게임 웹앱(PWA). 삼성 Z Flip7에서 브라우저/홈 화면 설치로 사용.
@@ -8,7 +8,7 @@
 ## 2. 위치
 - 라이브: https://ejs0417-sketch.github.io/diet-game/
 - 저장소: https://github.com/ejs0417-sketch/diet-game (main 브랜치 = GitHub Pages 배포본, 빌드 없음)
-- 기술: 바닐라 JS + localStorage, 서비스워커(sw.js, 캐시 이름 dg-<버전>), three.js 아바타, pdf.js·tesseract.js(지연 로드), MediaPipe Face Landmarker(vendor/mediapipe, 지연 로드).
+- 기술: 바닐라 JS + localStorage, 서비스워커(sw.js, 캐시 이름 dg-<버전>), three.js 아바타(GLB 캐릭터 + 절차적 폴백, vendor/three.custom.min.js = three r187 + GLTFLoader 커스텀 빌드), pdf.js·tesseract.js(지연 로드), MediaPipe Face Landmarker(vendor/mediapipe, 지연 로드).
 - 로그인/동기화: Supabase(Auth: Google PKCE, 테이블 public.user_data + RLS, 함수 delete_my_account()). Google OAuth 클라이언트는 Google Cloud 프로젝트 diet-game-514405, 동의 화면은 테스트 모드(ejs0417@gmail.com만 로그인 가능).
 - 비밀값(Supabase 토큰·DB 비밀번호, GitHub 토큰, Google 클라이언트 시크릿)은 이 문서와 저장소에 없음. 새 개발 봇은 준석님께 새로 발급받아 자기 비밀 저장소에 보관할 것(기존 토큰은 교체 권장).
 
@@ -22,6 +22,7 @@
 - 0.4.6 쿠팡이츠·배민·요기요 레이아웃 인식, 몇 명이서 나눠 먹기, 먹은 양, 남은 음식(약 2일, 이어서 먹음), 음식 178개
 - 0.4.7 사진 → 얼굴 분석 → 숫자 파라미터 → three.js 절차적 3D 캐릭터(사진은 분석 후 폐기), 체중에 따른 체형 변화
 - 0.4.8 끼니 기록 대표 메뉴 검색(한글 부분일치·초성·띄어쓰기 무시·별칭, 결과에 1인분 기준 kcal, 탭하면 먹은 양·나눠 먹기 흐름으로 연결). 음식 표 178개 재사용 + 식약처 외식영양성분자료집(2012) 기준 6개 보강(물냉면·비빔냉면·비빔국수·만둣국·청국장찌개·호박죽)
+- 0.4.9 승인된 캐릭터 시안 2장(현재 체형·목표 체형)을 이미지→3D(TRELLIS, 공개 HF Space trellis-community/TRELLIS)로 만든 GLB 2개(assets/avatar/char-current-0.4.9.glb, char-goal-0.4.9.glb, 각 약 0.7MB, 키 1.8 단위·발 y=0·정면 +Z, webp 2048 텍스처)를 홈/나 만들기 아바타 기본으로 적용. 진행도=(시작체중-체중)/(시작체중-목표체중): 0~50%는 지금 체형, 50% 넘으면 목표 체형으로 크로스페이드+약간 스케일 보간(예측 고스트도 지원), 대기 동작은 숨쉬기+좌우 흔들림(드래그로 회전). GLB 로드 실패·'직접 다듬기 캐릭터' 모드(localStorage dg_avatar_mode='proc')면 0.4.7 절차적 캐릭터로 폴백. 얼굴 분석·손으로 다듬기를 쓰면 자동으로 직접 다듬기 모드로 전환, '캐릭터 초기화'는 GLB로 복귀. sw.js 캐시 dg-0.4.9(GLB 포함). 0.4.8 잔여 수정: '치킨' 검색에 별칭 '치킨랩' 때문에 샐러드랩이 섞이던 문제(별칭은 전체를 입력할 때만 일치).
 
 ## 4. 지켜야 할 것
 - XP 검증: compute('2026-11-11') = 65 XP, Lv.1 유지.
@@ -30,6 +31,6 @@
 - 배포 전 node --check, 단위 테스트, 스크린샷 확인.
 
 ## 5. 다음 할 일
-1. 0.4.9 캐릭터: 0.4.7 절차적 캐릭터가 준석님을 충분히 닮지 않음. 준석님 사진으로 만든 캐릭터 디자인(현재 체형/목표 체형, 준석님 승인 방향)을 이미지→3D(TRELLIS, Hunyuan3D-2, TripoSR 등)로 GLB를 만들고, 체중에 따라 두 모델 사이를 바꾸는 방식. 디자인 이미지는 준석님께 받을 것(저장소에 없음).
+1. 0.4.9 캐릭터 후속: 폰(Z Flip7)에서 GLB 캐릭터 확인(얼굴 디테일이 확대하면 뭉개짐, 현재 체형 얼굴이 특히 약함). 더 좋은 GLB가 필요하면 시안 이미지(저장소에 없음, 준석님께 받을 것)를 rembg로 배경 제거 → TRELLIS(texture_size 2048, ss/slat steps 30, mesh_simplify 0.9) 재생성 → gltf-transform으로 최적화(민트 번짐 픽셀을 머리색으로 교체, webp 2048, 키 1.8·발 y=0 정규화). 공개 HF Space는 ZeroGPU 일일 할당량이 있어 막히면 시간을 두고 재시도.
 2. 실제 배달 캡처로 OCR 정확도 확인(준석님 폰에서 테스트).
 3. 이후 계획: 음식 사진 인식, 주문 전 코치, 0.5 식단·장보기, 0.6 위치, 0.7 응원.

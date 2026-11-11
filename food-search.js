@@ -29,6 +29,9 @@ const SEARCH_SYNONYMS={
   '떡볶이':['떡볶이']
 };
 
+// 0.4.9: 이 별칭은 질의가 별칭 전체를 다 입력했을 때만 맞춰요. ('치킨' 검색에 별칭 '치킨랩' 때문에 샐러드랩이 섞이던 문제)
+const FULL_ONLY_ALIASES=new Set(['치킨랩']);
+
 function foods(){return (root.DGFoods&&DGFoods.FOODS)||[];}
 
 function norm(s){
@@ -137,6 +140,7 @@ function searchFoods(query,opts){
       foodKeys(item).forEach(key=>{
         // '짜장말고짬뽕'처럼 부정 표현 별칭은 검색에서 빼요.
         if(/말고/.test(key)&&!norm(item.name).includes(qNorm))return;
+        if(FULL_ONLY_ALIASES.has(key)&&key!==item.name&&qNorm.length<norm(key).length)return;
         let s=scoreOne(qNorm,qCho,isCho,key);
         if(vi>0&&s>0)s=Math.max(0,s-6);
         if(s>best){best=s;via=key;}
