@@ -1,7 +1,8 @@
-// 다이어트 게임 0.4.3 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 비타민 XP)
-const VERSION='0.4.3', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.4 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치)
+const VERSION='0.4.4', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
+const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
 const SEED=[
  {date:'2026-11-10',type:'weight',item:'체중',value:'113.0',note:'시작 체중'},
  {date:'2026-11-10',type:'achievement',item:'시작의 용기',value:'',note:'게임 시작'},
@@ -23,6 +24,21 @@ function save(){localStorage.setItem(KEY,JSON.stringify(raw));if(window.DGAuth)D
 function saveSettings(){localStorage.setItem(SKEY,JSON.stringify(settings));if(window.DGAuth)DGAuth.schedulePush();}
 function withId(e){return Object.assign({id:Date.now().toString(36)+Math.random().toString(36).slice(2,7)},e);}
 function today(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul'}).format(new Date());}
+function suggestMealSlot(d,now){
+ now=now||new Date();
+ const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul'}).format(now);
+ if(d&&d!==day)return '점심';
+ const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(now);
+ const h=+(parts.find(x=>x.type==='hour')||{}).value||0;
+ const m=+(parts.find(x=>x.type==='minute')||{}).value||0;
+ const t=h*60+m;
+ if(t>=5*60&&t<9*60+30)return '아침';
+ if(t>=9*60+30&&t<11*60+30)return '아점';
+ if(t>=11*60+30&&t<14*60)return '점심';
+ if(t>=14*60&&t<16*60+30)return '점저';
+ if(t>=16*60+30&&t<20*60+30)return '저녁';
+ return '야식';
+}
 const dn=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5;
 const ds=n=>new Date(n*864e5).toISOString().slice(0,10);
 const week=d=>Math.floor((dn(d)-dn(START_DATE))/7);
@@ -67,7 +83,7 @@ function compute(T){
    else if(e.type==='exercise'&&e.item==='근력'){info.strMin+=(+e.value>0?+e.value:STR_DEFAULT_MIN);if(!info.strength){info.strength=1;strW[wk]=(strW[wk]||0)+1;if(strW[wk]<=3){r.xp=15;habit.push(r);}if(strW[wk]===2)award(d,'근력 스타트');}}
    else if(e.type==='rest'){info.rest=true;}
    else if(e.type==='water'){const before=info.water;info.water=+(info.water+(+e.value||0)).toFixed(2);if(before<2&&info.water>=2){r.xp=5;habit.push(r);}}
-   else if(e.type==='vitamin'){if(e.item&&!info.vit[e.item]){info.vit[e.item]=1;const left=15-info.vitXp;r.xp=Math.max(0,Math.min(5,left));info.vitXp+=r.xp;}}
+   else if(e.type==='vitamin'){if(e.item&&!info.vit[e.item]){info.vit[e.item]=1;const unit=(e.need==='1'||e.value==='need')?7:5;const left=15-info.vitXp;r.xp=Math.max(0,Math.min(unit,left));info.vitXp+=r.xp;}}
    else if(e.type==='health_quest'){if(e.item&&!info.hq[e.item]){info.hq[e.item]=1;const unit=(typeof DGHealth!=='undefined'&&DGHealth.HQ_XP&&DGHealth.HQ_XP[e.item])||5;const left=30-info.hqXp;r.xp=Math.max(0,Math.min(unit,left));info.hqXp+=r.xp;}}
    else if(e.type==='achievement'){const a=ACH.find(x=>x[0]===e.item);if(a&&!got[a[0]]){got[a[0]]=d;r.xp=a[2];}else continue;}
    rows.push(r);
@@ -160,7 +176,7 @@ function add(e){const before=compute().total;raw.push(withId(e));save();const C=
 function del(id){if(!confirm('이 기록을 지울까요?'))return;raw=raw.filter(e=>e.id!==id);save();render();}
 const NAV=[['home','🏠','홈'],['quest','📋','퀘스트'],['log','📊','기록'],['ach','🛡️','업적'],['me','👤','내정보']];
 const QICBG={'⚖️':'var(--mint-50)','🍱':'#FFF4E5','👟':'#EAF0FF','💧':'#E6F6FF','💪':'#FFEDEB','📉':'#EAF0FF','🔥':'#FFF0E2'};
-function render(){const C=compute();
+function render(){migrateVitaminsOnce();const C=compute();
  $('#nav').className='tab-bar';
  $('#nav').innerHTML=NAV.map(([k,i,l])=>`<button type="button" ${tab===k?'aria-current="page"':''} onclick="tab='${k}';render()"><span class="ti">${i}</span>${l}</button>`).join('');
  if(tab!=='me'){pvKg=null;meBase=null;}
@@ -202,28 +218,51 @@ function home(C){const qs=questDefs(C),show=qs.filter(q=>!q.done).slice(0,3);whi
  ${C.next?`<div class="next-stage" style="flex-direction:column;align-items:stretch;gap:2px"><div style="display:flex;justify-content:space-between"><span>다음 단계</span><span>+${C.next[1]} XP</span></div><div style="color:var(--ink-900);font-size:14px"><span class="num">${C.next[0]}kg</span> ${C.next[2]}</div></div>`:''}</div></section>
  <div class="section-title"><h2>오늘의 퀘스트 ⭐</h2><a class="link" onclick="tab='quest';render()">${all?'모두 완료! +20 XP':'모두 완료하면 +20 XP'} ›</a></div>
  ${show.map(q=>qCard(q)).join('')}
+ ${(window.DGCoach?DGCoach.card(C):'')}
  <div class="card" style="margin-top:4px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">빠른 기록</h3><span class="stat-chip flame">🔥 스트릭 <span class="num">${C.streak}</span>일</span></div>
  <div class="quick">${quick()}</div>${vitButtons(today())}</div>
  ${(window.DGHealth?DGHealth.summaryCard():'')}
  </div>`;}
-function quick(){return `<button type="button" onclick="askWeight()"><span class="e">⚖️</span>체중</button><button type="button" onclick="tab='log';logKind='meal';render();setTimeout(()=>{const el=$('#mealMenu');if(el)el.focus();},50)"><span class="e">🍱</span>식사</button><button type="button" onclick="addWalk()"><span class="e">👟</span>걷기</button><button type="button" onclick="add({date:today(),type:'water',item:'물',value:'0.5',note:''})"><span class="e">💧</span>물 0.5L</button>`;}
-function vitList(){if(!Array.isArray(settings.vitamins))return ['종합비타민'];return [...new Set(settings.vitamins.map(s=>String(s).trim()).filter(Boolean))];}
-function hasVit(d,item){return raw.some(e=>e.date===d&&e.type==='vitamin'&&e.item===item);}
+function quick(){return `<button type="button" onclick="askWeight()"><span class="e">⚖️</span>체중</button><button type="button" onclick="tab='log';logKind='meal';mealKind=suggestMealSlot();render();setTimeout(()=>{const el=$('#mealMenu');if(el)el.focus();},50)"><span class="e">🍱</span>식사</button><button type="button" onclick="addWalk()"><span class="e">👟</span>걷기</button><button type="button" onclick="add({date:today(),type:'water',item:'물',value:'0.5',note:''})"><span class="e">💧</span>물 0.5L</button>`;}
+function normVit(s){return (typeof DGSup!=='undefined'&&DGSup.norm)?DGSup.norm(s):String(s||'').trim();}
+function vitList(){const rawv=Array.isArray(settings.vitamins)?settings.vitamins:['종합비타민'];
+ const src=(typeof DGSup!=='undefined'&&DGSup.migrateList)?DGSup.migrateList(rawv):[...new Set(rawv.map(s=>String(s).trim()).filter(Boolean))];
+ return src.length?src:['종합비타민'];}
+function migrateVitaminsOnce(){
+ if(typeof DGSup==='undefined'||!DGSup.migrateList)return;
+ const v=DGSup.migrateList(settings.vitamins);
+ if(v.join('\0')!==(Array.isArray(settings.vitamins)?settings.vitamins:[]).join('\0')){settings.vitamins=v;saveSettings();}
+}
+function hasVit(d,item){const n=normVit(item);return raw.some(e=>e.date===d&&e.type==='vitamin'&&normVit(e.item)===n);}
+function findVit(d,item){const n=normVit(item);return raw.find(e=>e.date===d&&e.type==='vitamin'&&normVit(e.item)===n);}
+function vitNeeded(name,C){
+ C=C||compute();const recs=(typeof DGSup!=='undefined'&&DGSup.recommend)?DGSup.recommend({weight:C.weight,goal:settings.goal,prot:(C.days[C.today]||{}).prot,kcal:(C.days[C.today]||{}).kcal,closed:(C.days[C.today]||{}).closed}):[];
+ return recs.some(r=>normVit(r.name)===normVit(name));
+}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 function vitButtons(d){d=d||today();const items=vitList(),multi=items.length>1;
- if(!items.length)return `<div class="vit-row"><button type="button" class="btn-ghost" onclick="tab='me';render()">비타민을 내정보에서 추가해 주세요 ›</button></div>`;
- return `<div class="vit-row">`+items.map(name=>{const on=hasVit(d,name);const label=multi?(on?'✅ ':'💊 ')+esc(name):(on?'✅ 비타민 먹었어요':'💊 비타민 먹었어요');
-  return `<button type="button" class="${on?'on':''}" onclick="toggleVit('${escJs(name)}','${d}')">${label}</button>`;}).join('')+`</div>`;}
-function toggleVit(item,d){d=d||today();item=String(item||'').trim();if(!item)return;
- const existing=raw.find(e=>e.date===d&&e.type==='vitamin'&&e.item===item);
- if(existing){raw=raw.filter(e=>e.id!==existing.id);save();toast('비타민 기록을 취소했어요');render();}
- else add({date:d,type:'vitamin',item,value:'1',note:''});}
-function addVitName(){const el=$('#vitNew');const name=(el&&el.value||'').trim();if(!name)return toast('이름을 적어 주세요');
+ if(!items.length)return `<div class="vit-row"><button type="button" class="btn-ghost" onclick="tab='me';render()">영양제를 내정보에서 추가해 주세요 ›</button></div>`;
+ const recs=(typeof DGSup!=='undefined'&&DGSup.recommend)?DGSup.recommend({weight:compute().weight,goal:settings.goal}):[];
+ const miss=(typeof DGSup!=='undefined'&&DGSup.missing)?DGSup.missing(items,recs):[];
+ const allOn=items.every(n=>hasVit(d,n));
+ const btns=items.map(name=>{const on=hasVit(d,name),need=vitNeeded(name);const label=multi?(on?'✅ ':'💊 ')+esc(name)+(need&&!on?' ·추천':''):(on?'✅ 오늘 먹었어요':'💊 영양제 먹었어요');
+  return `<button type="button" class="${on?'on':''}${need&&!on?' need':''}" onclick="toggleVit('${escJs(name)}','${d}')">${label}</button>`;}).join('');
+ return `<div class="vit-row">${btns}</div>
+  <button type="button" class="btn-secondary btn-sm" style="width:100%;margin-top:8px" onclick="takeAllVit('${d}')">${allOn?'오늘 다 먹음 완료':'오늘 다 먹음'}</button>
+  ${miss.length?`<div class="muted" style="font-size:12px;margin-top:6px">추천인데 목록에 없어요: ${miss.map(r=>esc(r.name)).join(', ')} · <a class="link" onclick="tab='me';render()">내정보에서 보기</a></div>`:''}`;}
+function toggleVit(item,d){d=d||today();item=normVit(item);if(!item)return;
+ const existing=findVit(d,item);
+ if(existing){raw=raw.filter(e=>e.id!==existing.id);save();toast('영양제 기록을 취소했어요');render();}
+ else add({date:d,type:'vitamin',item,value:'1',need:vitNeeded(item)?'1':'',note:''});}
+function takeAllVit(d){d=d||today();const items=vitList();const before=compute().total;let n=0;
+ items.forEach(name=>{if(!hasVit(d,name)){raw.push(withId({date:d,type:'vitamin',item:normVit(name),value:'1',need:vitNeeded(name)?'1':'',note:''}));n++;}});
+ if(!n)return toast('이미 다 기록했어요');save();const g=compute().total-before;toast(g>0?`오늘 영양제 ${n}개 · +${g} XP`:`오늘 영양제 ${n}개 기록했어요`);render();}
+function addVitName(name){name=normVit(name||(($('#vitNew')&&$('#vitNew').value)||''));if(!name)return toast('이름을 적어 주세요');
  if(name.length>20)return toast('이름은 20자 이하로 적어 주세요');
  const cur=vitList();if(cur.includes(name))return toast('이미 있어요');
- settings.vitamins=cur.concat([name]);saveSettings();toast('비타민을 추가했어요');render();}
-function removeVit(name){name=String(name||'').trim();settings.vitamins=vitList().filter(x=>x!==name);saveSettings();render();}
+ settings.vitamins=cur.concat([name]);saveSettings();toast('영양제를 추가했어요');render();}
+function removeVit(name){name=normVit(name);settings.vitamins=vitList().filter(x=>x!==name);saveSettings();render();}
 function predRange(C){return `${(C.pred-0.5).toFixed(1)}~${(C.pred+0.5).toFixed(1)}kg`;}
 function askYesterday(d){const y=ds(dn(d)-1),C=compute(),Y=C.days[y],k='dg_asked_'+y;if(!Y||Y.closed||!Y.mealCount||localStorage.getItem(k))return;localStorage.setItem(k,'1');
  if(confirm(`어제(${y.slice(5)}) 식사가 마감되지 않았어요. 빠진 끼니 있나요?\n확인을 누르면 어제 기록으로 가서 추가하고 마감할 수 있어요.`)){tab='log';logDate=y;render();}}
@@ -273,12 +312,12 @@ function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0
  const wts=C.status.filter(s=>s.weight!=='').slice(-14);
  const isToday=T===C.today, canNext=T<C.today;
  const kinds=[['weight','⚖️ 체중'],['meal','🍱 식사'],['exercise','👟 운동'],['water','💧 물']];
- const meals=['아침','점심','저녁','간식'];
+ const meals=MEAL_SLOTS;
  const form={
   weight:`<label class="field" style="margin-bottom:14px"><span class="label">체중(kg)</span><input class="input" id="w" type="number" step="0.1" placeholder="예: 112.5" inputmode="decimal"></label>
    <button type="button" class="btn-primary btn-lg" onclick="sub('weight')">체중 기록 <span class="stat-chip gold" style="min-height:26px;padding:0 8px;font-size:12px;box-shadow:none">+10 XP</span></button>`,
   meal:`<div class="label" style="font-size:13px;font-weight:700;margin-bottom:6px">끼니</div>
-   <div class="segmented" data-seg="meal" style="margin-bottom:12px;background:#F3F5FB" role="tablist">${meals.map(m=>`<button type="button" data-k="${m}" aria-selected="${mealKind===m}" onclick="setMealKind('${m}')">${m}</button>`).join('')}</div>
+   <div class="segmented meal-slots" data-seg="meal" style="margin-bottom:12px;background:#F3F5FB" role="tablist">${meals.map(m=>`<button type="button" data-k="${m}" aria-selected="${mealKind===m}" onclick="setMealKind('${m}')">${m}</button>`).join('')}</div>
    <label class="field" style="margin-bottom:10px"><span class="label">메뉴</span><input class="input" id="mealMenu" placeholder="메뉴를 적어 주세요"></label>
    <div class="rowx" style="margin-bottom:14px"><label class="field"><span class="label">kcal <span class="muted">(선택)</span></span><input class="input" id="kcal" type="number" placeholder="예: 520" inputmode="numeric"></label>
    <label class="field"><span class="label">단백질 g <span class="muted">(선택)</span></span><input class="input" id="prot" type="number" placeholder="예: 40" inputmode="numeric"></label></div>
@@ -297,7 +336,7 @@ function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0
  <div class="card"><h3>새 기록</h3>
   <div class="segmented" data-seg="kind" role="tablist" style="margin-bottom:14px">${kinds.map(([k,l])=>`<button type="button" data-k="${k}" aria-selected="${logKind===k}" onclick="setLogKind('${k}')">${l}</button>`).join('')}</div>
   ${kinds.map(([k])=>`<div data-logkind="${k}" ${logKind===k?'':'hidden'}>${form[k]}</div>`).join('')}
-  <div class="muted" style="margin-top:14px">비타민 (하루에 종류마다 한 번, 다시 누르면 취소)</div>${vitButtons(T)}</div>
+  <div class="muted" style="margin-top:14px">영양제 (하루에 종류마다 한 번, 다시 누르면 취소)</div>${vitButtons(T)}</div>
  <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">${isToday?'오늘':T.slice(5)} 합계</h3><span class="stat-chip" style="background:${d.closed?'var(--mint-50)':'var(--coral-50)'};color:${d.closed?'var(--mint-700)':'var(--coral-700)'};box-shadow:none;min-height:28px;font-size:12px">${d.closed?'마감 ✅':'미정산'}</span></div>
   <div class="muted" style="margin:4px 0 12px">식사 ${d.mealCount}끼 · ${d.kcal}kcal${d.missingKcal?' (kcal 빠진 끼니 '+d.missingKcal+'개)':''} · 단백질 ${d.prot}g</div>
   <div style="font-size:13px;font-weight:700;display:flex;justify-content:space-between"><span>🔥 칼로리</span><span class="num">${d.kcal} / 1,800kcal</span></div>
@@ -381,16 +420,48 @@ function infoCard(C){return `<div class="card"><h3>내 정보</h3>
  <div class="rowx"><input class="input" id="goal" type="number" step="0.5" value="${settings.goal}"><button type="button" class="btn-primary" onclick="settings.goal=+$('#goal').value;saveSettings();render()">장기 목표 저장</button></div></div>`;}
 function backupCard(){return `<div class="card"><h3>기록 백업</h3><div class="muted" style="margin-bottom:10px">게임 마스터와 같은 log.csv·status.csv 형식이에요.</div>
  <div class="rowx"><button type="button" class="btn-secondary" onclick="exportCsv()">⬇️ 내보내기</button><label class="btn-secondary" style="display:inline-flex;cursor:pointer">⬆️ 가져오기 (log.csv)<input type="file" accept=".csv,text/csv" style="display:none" onchange="importCsv(this.files[0])"></label></div></div>`;}
-function vitCard(){const items=vitList();
- return `<div class="card" id="vitCard"><h3>💊 비타민</h3>
-  <div class="muted" style="margin-bottom:10px">하루에 종류마다 한 번 기록해요. 하나당 +5 XP, 하루 최대 +15 XP. 7일 연속하면 업적 보너스가 있어요.</div>
-  ${items.length?items.map(n=>`<div class="list-row"><div class="m"><b>${esc(n)}</b></div><button type="button" class="btn-ghost btn-sm" onclick="removeVit('${escJs(n)}')">삭제</button></div>`).join(''):'<div class="muted">아직 없어요. 아래에서 추가해 주세요.</div>'}
-  <div class="rowx" style="margin-top:10px"><input class="input" id="vitNew" placeholder="예: 오메가3, 비타민D"><button type="button" class="btn-primary" onclick="addVitName()">추가</button></div>
+function vitCard(){migrateVitaminsOnce();const items=vitList();
+ const recs=(typeof DGSup!=='undefined'&&DGSup.recommend)?DGSup.recommend({weight:compute().weight,goal:settings.goal,prot:(compute().days[compute().today]||{}).prot,kcal:(compute().days[compute().today]||{}).kcal,closed:(compute().days[compute().today]||{}).closed}):[];
+ const miss=(typeof DGSup!=='undefined'&&DGSup.missing)?DGSup.missing(items,recs):[];
+ const ov=(typeof DGSup!=='undefined'&&DGSup.overlaps)?DGSup.overlaps(items):[];
+ const cat=(typeof DGSup!=='undefined'&&DGSup.CATALOG)?DGSup.CATALOG:[];
+ const inStack=n=>items.includes(n);
+ return `<div class="card" id="vitCard"><h3>💊 내 영양제</h3>
+  <div class="muted" style="margin-bottom:10px">하루에 종류마다 한 번 기록해요. 기본 +5 XP, 추천·필요 항목은 +7 XP, 하루 최대 +15 XP. 7일 연속 업적이 있어요.</div>
+  ${items.length?items.map(n=>{const spec=cat.find(c=>c.name===n);const need=recs.some(r=>r.name===n);
+    return `<div class="list-row"><div class="m"><b>${esc(n)}${need?' <span class="hchip warn">추천</span>':''}</b><span>${esc((spec&&spec.for)||'직접 추가한 항목')}${spec&&spec.caution?' · '+spec.caution:''}</span></div><button type="button" class="btn-ghost btn-sm" onclick="removeVit('${escJs(n)}')">삭제</button></div>`;}).join(''):'<div class="muted">아직 없어요. 아래에서 골라 주세요.</div>'}
+  ${ov.length?`<div class="banner flat" style="margin-top:8px">${ov.map(o=>esc(o.text)).join('<br>')}</div>`:''}
+  ${miss.length?`<div class="banner warn" style="margin-top:8px;display:block"><b style="display:block;margin-bottom:8px">목록에 없는 추천</b>${miss.map(r=>`<div class="list-row"><div class="m"><b>${esc(r.name)}</b><span>${esc(r.why)}${r.caution?' · '+r.caution:''}</span></div><button type="button" class="btn-primary btn-sm" onclick="addVitName('${escJs(r.name)}')">추가</button></div>`).join('')}</div>`:''}
+  <div class="muted" style="margin:10px 0 6px">카탈로그에서 고르기</div>
+  <div class="look-picks" style="margin-bottom:10px">${cat.map(c=>`<button type="button" class="chip${inStack(c.name)?' on':''}" onclick="${inStack(c.name)?"removeVit('"+escJs(c.name)+"')":"addVitName('"+escJs(c.name)+"')"}">${esc(c.name)}</button>`).join('')}</div>
+  <div class="rowx"><input class="input" id="vitNew" placeholder="없으면 이름만 적어 추가"><button type="button" class="btn-primary" onclick="addVitName()">추가</button></div>
+  <div class="muted" style="font-size:11px;margin-top:8px">${esc((typeof DGSup!=='undefined'&&DGSup.DISCLAIMER)||'건강 정보는 참고용이에요. 진단이 아니며, 정확한 판단은 의사에게 받으세요.')}</div>
  </div>`;}
 // ---------- 나 만들기 (3D 아바타) ----------
 const FACEKEY='dg_face_v1';let pvKg=null,meBase=null;
-function makeMe(C){const base=meBase??+C.avatarW.toFixed(1),goal=settings.goal,v=pvKg??base,hasFace=!!localStorage.getItem(FACEKEY);
- const lo=86;return `<div class="card" id="makeMe"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">🧍 나 만들기</h3><span class="muted">좌우로 밀면 돌아가요</span></div>
+function faceStore(){
+ const def={photo:null,skin:'warm',hairColor:'darkbrown',hairStyle:'short',faceShape:'oval'};
+ try{const s=localStorage.getItem(FACEKEY);if(!s)return Object.assign({},def);
+  if(s.startsWith('data:'))return Object.assign({},def,{photo:s});
+  const o=JSON.parse(s);return Object.assign({},def,o&&typeof o==='object'?o:{});}
+ catch(e){return Object.assign({},def);}
+}
+function saveFaceStore(patch){
+ const cur=Object.assign(faceStore(),patch||{});
+ try{localStorage.setItem(FACEKEY,JSON.stringify(cur));}catch(e){toast('저장 공간이 부족해요');return false;}
+ if(window.DGAvatar){DGAvatar.setLook(cur);if(patch&&('photo' in patch))DGAvatar.setFace(cur.photo||null);}
+ return true;
+}
+const LOOK_LABELS={
+ skin:{light:'밝은',warm:'따뜻한',medium:'중간',tan:'구릿빛',deep:'깊은'},
+ hairColor:{black:'검정',darkbrown:'진갈색',brown:'갈색',auburn:'적갈색',blonde:'밝은',gray:'회색'},
+ hairStyle:{short:'짧은',side:'사이드',buzz:'짧게 밀기',curly:'컬'},
+ faceShape:{oval:'계란형',round:'둥근',long:'긴',square:'각진'}
+};
+function makeMe(C){const base=meBase??+C.avatarW.toFixed(1),goal=settings.goal,v=pvKg??base,st=faceStore(),hasFace=!!st.photo;
+ const lo=86;
+ const pick=(key,cur)=>Object.keys(LOOK_LABELS[key]).map(k=>`<button type="button" class="chip${cur===k?' on':''}" onclick="setLookField('${key}','${k}')">${LOOK_LABELS[key][k]}</button>`).join('');
+ return `<div class="card" id="makeMe"><div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">🧍 나 만들기</h3><span class="muted">좌우로 밀면 돌아가요</span></div>
  <div style="margin:12px 0"><div class="avatar-frame" id="avatarSlot" style="height:330px" data-kg="${v}" data-idle="0.25"><img class="fallback" src="char.png" alt="캐릭터"><div class="pedestal"></div><div class="avcap" id="pvCap">${pvLabel(base,v)}</div></div></div>
  <div class="rowx" style="margin-bottom:6px"><label class="field"><span class="label">키(cm) 🔒</span><input class="input" type="number" value="${HEIGHT}" disabled></label>
  <label class="field"><span class="label">현재 체중(kg)</span><input class="input" id="meW" type="number" step="0.1" value="${base}" onchange="setBase(this.value)"></label></div>
@@ -398,21 +469,142 @@ function makeMe(C){const base=meBase??+C.avatarW.toFixed(1),goal=settings.goal,v
  <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="color:var(--ink-900)">목표 체형 미리보기</b><span class="num" style="font-weight:800;color:var(--coral-600)">${(+v).toFixed(1)}kg</span></div>
  <input class="range" id="pv" type="range" min="${lo}" max="${Math.max(base,lo+1)}" step="0.5" value="${v}" oninput="previewKg(this.value)">
  <div class="rowx" style="margin-bottom:14px"><button type="button" class="btn-secondary btn-sm" onclick="previewKg(${base})">지금 ${base}kg</button><button type="button" class="btn-secondary btn-sm" style="border-color:var(--mint-500);color:var(--mint-700);background:var(--mint-50)" onclick="previewKg(${goal})">목표 ${goal}kg</button><button type="button" class="btn-secondary btn-sm" onclick="previewKg(86)">86kg</button></div>
- <b style="color:var(--ink-900)">얼굴 사진 (선택)</b>
- <div style="display:flex;gap:8px;margin:8px 0 6px;flex-wrap:wrap"><label class="btn-primary btn-sm" style="display:inline-flex;cursor:pointer">📷 사진 고르기<input type="file" accept="image/*" capture="user" style="display:none" onchange="pickFace(this.files[0])"></label>${hasFace?'<button type="button" class="btn-ghost btn-sm" onclick="delFace()">사진 지우기</button>':''}</div>
+ <b style="color:var(--ink-900)">나처럼 보이게</b>
+ <div class="muted" style="margin:6px 0 8px">사진으로 피부·머리·얼굴형을 추정하고, 아래에서 바로 고칠 수 있어요. 사진은 이 폰 안에만 남아요.</div>
+ <div style="display:flex;gap:8px;margin:0 0 10px;flex-wrap:wrap">
+  <button type="button" class="btn-primary btn-sm" onclick="openCam()">📷 카메라로 찍기</button>
+  <label class="btn-secondary btn-sm" style="display:inline-flex;cursor:pointer">갤러리에서 고르기<input type="file" accept="image/*" style="display:none" onchange="pickFace(this.files[0])"></label>
+  ${hasFace?'<button type="button" class="btn-ghost btn-sm" onclick="delFace()">사진 지우기</button>':''}
+ </div>
+ <div class="look-block"><div class="label">피부톤</div><div class="look-picks">${pick('skin',st.skin)}</div></div>
+ <div class="look-block"><div class="label">머리 색</div><div class="look-picks">${pick('hairColor',st.hairColor)}</div></div>
+ <div class="look-block"><div class="label">머리 모양</div><div class="look-picks">${pick('hairStyle',st.hairStyle)}</div></div>
+ <div class="look-block"><div class="label">얼굴형</div><div class="look-picks">${pick('faceShape',st.faceShape)}</div></div>
  <div class="muted">🔒 사진은 이 폰 안에만 저장돼요. 어디에도 올리지 않아요.</div></div>`;}
+function setLookField(key,val){if(!saveFaceStore({[key]:val}))return;toast('아바타에 반영했어요');render();}
 function pvLabel(base,v){const d=+(base-v).toFixed(1);return d>0?`지금 ${(+base).toFixed(1)}kg → 미리보기 ${(+v).toFixed(1)}kg (−${d.toFixed(1)}kg)`:`지금 ${(+base).toFixed(1)}kg`;}
 function previewKg(v){v=+v;pvKg=v;const base=meBase??+compute().avatarW.toFixed(1);const r=$('#pv');if(r)r.value=v;const c=$('#pvCap');if(c)c.textContent=pvLabel(base,v);
  const kgEl=document.querySelector('#makeMe .num[style*="coral"]');if(kgEl)kgEl.textContent=v.toFixed(1)+'kg';
  if(window.DGAvatar)DGAvatar.setWeight(v);}
 function setBase(v){v=+v;if(!(v>=40&&v<=250))return;meBase=v;pvKg=v;render();}
+function applyPhotoData(url,guessed){
+ const patch={photo:url};
+ if(guessed){['skin','hairColor','hairStyle','faceShape'].forEach(k=>{if(guessed[k])patch[k]=guessed[k];});}
+ if(!saveFaceStore(patch))return;
+ if(window.DGAvatar){DGAvatar.setLook(faceStore());DGAvatar.setFace(url);}
+ toast(guessed?'사진으로 추정했어요. 아래 칸에서 고칠 수 있어요':'얼굴을 입혔어요 (폰에만 저장)');
+ render();
+}
 function pickFace(file){if(!file)return;const fr=new FileReader();fr.onload=()=>{const img=new Image();img.onload=()=>{
   const S=256,c=document.createElement('canvas');c.width=c.height=S;const x=c.getContext('2d'),m=Math.min(img.width,img.height);
   x.drawImage(img,(img.width-m)/2,(img.height-m)/2,m,m,0,0,S,S);const url=c.toDataURL('image/jpeg',0.85);
-  try{localStorage.setItem(FACEKEY,url);}catch(e){return toast('저장 공간이 부족해요');}
-  if(window.DGAvatar)DGAvatar.setFace(url);toast('얼굴을 입혔어요 (폰에만 저장)');render();};
-  img.onerror=()=>toast('사진을 읽지 못했어요');img.src=fr.result;};fr.readAsDataURL(file);}
-function delFace(){if(!confirm('얼굴 사진을 지울까요?'))return;localStorage.removeItem(FACEKEY);if(window.DGAvatar)DGAvatar.setFace(null);toast('사진을 지웠어요');render();}
+  const g=guessLookFromCanvas(c);
+  applyPhotoData(url,g);
+ };img.onerror=()=>toast('사진을 읽지 못했어요');img.src=fr.result;};fr.readAsDataURL(file);}
+function delFace(){if(!confirm('얼굴 사진을 지울까요? 피부·머리 설정은 남아요.'))return;
+ if(!saveFaceStore({photo:null}))return;if(window.DGAvatar)DGAvatar.setFace(null);toast('사진을 지웠어요');render();}
+let camStream=null,camUrl=null;
+function openCam(){
+ closeCam(true);
+ const el=document.createElement('div');el.id='camPane';el.className='cam-pane';
+ el.innerHTML=`<div class="health-sheet cam-sheet"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h2 style="margin:0">나 찍기</h2><button type="button" class="btn-ghost btn-sm" onclick="closeCam()">닫기</button></div>
+  <div class="muted" style="margin-bottom:8px">전면 카메라로 찍어요. 사진은 이 폰에만 남고 서버로 가지 않아요.</div>
+  <div class="cam-box"><video id="camVideo" autoplay playsinline muted></video><canvas id="camSnap" hidden></canvas><img id="camPreview" alt="" hidden></div>
+  <div class="rowx" style="margin-top:12px" id="camActions"><button type="button" class="btn-primary btn-lg" onclick="snapCam()">촬영</button></div>
+  <div class="muted" style="margin-top:8px">카메라를 쓸 수 없으면 갤러리에서 고르기를 이용해 주세요.</div></div>`;
+ document.body.appendChild(el);
+ startCam();
+}
+async function startCam(){
+ try{
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)throw new Error('no-cam');
+  camStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:{ideal:720},height:{ideal:720}},audio:false});
+  const v=$('#camVideo');if(v){v.srcObject=camStream;v.hidden=false;}
+ }catch(e){
+  toast('카메라를 열 수 없어요. 갤러리에서 골라 주세요');
+  closeCam();
+ }
+}
+function snapCam(){
+ const v=$('#camVideo');if(!v||!v.videoWidth)return toast('카메라가 아직 준비 중이에요');
+ const S=256,c=$('#camSnap')||document.createElement('canvas');c.width=c.height=S;
+ const x=c.getContext('2d');
+ const m=Math.min(v.videoWidth,v.videoHeight);
+ // mirror front camera so preview feels natural, but store unmirrored? keep mirrored as selfie
+ x.translate(S,0);x.scale(-1,1);
+ x.drawImage(v,(v.videoWidth-m)/2,(v.videoHeight-m)/2,m,m,0,0,S,S);
+ camUrl=c.toDataURL('image/jpeg',0.85);
+ const img=$('#camPreview');if(img){img.src=camUrl;img.hidden=false;}
+ if(v)v.hidden=true;
+ const a=$('#camActions');if(a)a.innerHTML=`<button type="button" class="btn-secondary" onclick="retakeCam()">다시 찍기</button><button type="button" class="btn-primary" onclick="useCamShot()">이 사진 쓰기</button>`;
+}
+function retakeCam(){camUrl=null;const img=$('#camPreview');if(img)img.hidden=true;const v=$('#camVideo');if(v)v.hidden=false;
+ const a=$('#camActions');if(a)a.innerHTML=`<button type="button" class="btn-primary btn-lg" onclick="snapCam()">촬영</button>`;}
+function useCamShot(){
+ if(!camUrl)return;
+ const url=camUrl;
+ const c=document.createElement('canvas');c.width=c.height=256;const im=new Image();
+ im.onload=()=>{const x=c.getContext('2d');x.drawImage(im,0,0,256,256);const g=guessLookFromCanvas(c);closeCam();applyPhotoData(url,g);};
+ im.src=url;
+}
+function closeCam(keep){
+ if(camStream){camStream.getTracks().forEach(tr=>tr.stop());camStream=null;}
+ if(!keep)camUrl=null;
+ const el=$('#camPane');if(el)el.remove();
+}
+function isSkinPix(r,g,b){const y=0.299*r+0.587*g+0.114*b,cb=128-0.168736*r-0.331264*g+0.5*b,cr=128+0.5*r-0.418688*g-0.081312*b;
+ return y>50&&cr>133&&cr<185&&cb>77&&cb<135&&r>=g&&g>=b*0.7;}
+function skinToneFromRgb(r,g,b){const L=0.299*r+0.587*g+0.114*b;if(L>=218)return 'light';if(L>=175)return 'warm';if(L>=130)return 'medium';if(L>=90)return 'tan';return 'deep';}
+function nearestHair(r,g,b){
+ const pal={black:[26,20,18],darkbrown:[43,37,34],brown:[90,58,34],auburn:[107,46,31],blonde:[198,161,91],gray:[138,134,128]};
+ let best='darkbrown',bd=1e9;
+ Object.keys(pal).forEach(k=>{const p=pal[k],d=(p[0]-r)**2+(p[1]-g)**2+(p[2]-b)**2;if(d<bd){bd=d;best=k;}});
+ const L=0.299*r+0.587*g+0.114*b;
+ if(L<40)return 'black';
+ return best;
+}
+function faceShapeFromBox(w,h,jaw,cheek){
+ if(!w||!h)return 'oval';
+ const ar=h/w;
+ if(ar>=1.22)return 'long';
+ if(ar<=0.95)return 'round';
+ if(jaw&&cheek&&jaw>=cheek*0.98&&ar<1.12)return 'square';
+ return 'oval';
+}
+function guessLookFromCanvas(c){
+ try{
+  const src=document.createElement('canvas');src.width=64;src.height=64;const x=src.getContext('2d');
+  x.drawImage(c,0,0,64,64);const data=x.getImageData(0,0,64,64).data;
+  let sr=0,sg=0,sb=0,sn=0,minX=64,maxX=0,minY=64,maxY=0;
+  let jawW=0,cheekW=0,jawN=0,cheekN=0;
+  for(let y=16;y<52;y++)for(let p=14;p<50;p++){
+    const i=(y*64+p)*4,r=data[i],g=data[i+1],b=data[i+2];
+    if(!isSkinPix(r,g,b))continue;
+    sr+=r;sg+=g;sb+=b;sn++;
+    if(p<minX)minX=p;if(p>maxX)maxX=p;if(y<minY)minY=y;if(y>maxY)maxY=y;
+    if(y>=36&&y<=48){jawW+=1;jawN++;}
+    if(y>=24&&y<=32){cheekW+=1;cheekN++;}
+  }
+  let hr=0,hg=0,hb=0,hn=0,left=0,right=0;
+  for(let y=1;y<16;y++)for(let p=10;p<54;p++){
+    const i=(y*64+p)*4,r=data[i],g=data[i+1],b=data[i+2],L=0.299*r+0.587*g+0.114*b;
+    if(isSkinPix(r,g,b)&&L>90)continue;
+    if(L>200)continue;
+    hr+=r;hg+=g;hb+=b;hn++;
+    if(p<32)left++;else right++;
+  }
+  const skin=sn?skinToneFromRgb(sr/sn,sg/sn,sb/sn):'warm';
+  const hairColor=hn?nearestHair(hr/hn,hg/hn,hb/hn):'darkbrown';
+  let hairStyle='short';
+  if(hn<40)hairStyle='buzz';
+  else if(hn>180&&Math.abs(left-right)<hn*0.08)hairStyle='curly';
+  else if(hn>30&&(left>right*1.6||right>left*1.6))hairStyle='side';
+  const faceShape=faceShapeFromBox(maxX-minX,maxY-minY,jawN?jawW/jawN:0,cheekN?cheekW/cheekN:0);
+  return {skin,hairColor,hairStyle,faceShape};
+ }catch(e){return {skin:'warm',hairColor:'darkbrown',hairStyle:'short',faceShape:'oval'};}
+}
+window.DGLook={skinToneFromRgb,nearestHair,faceShapeFromBox,suggestMealSlot,isSkinPix};
 window.dgMountAvatar=function(){const el=typeof document!=='undefined'&&document.querySelector('#avatarSlot');if(!el||!window.DGAvatar)return;
  const g=el.dataset.ghost;DGAvatar.mount(el,{kg:+el.dataset.kg,ghostKg:g&&+g<=+el.dataset.kg-0.1?+g:null,idle:+el.dataset.idle});};
 // boot() is in index.html after auth.js loads
+try{mealKind=suggestMealSlot();}catch(e){}

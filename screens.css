@@ -101,3 +101,23 @@ body.gate main,body.gate nav{display:none}
 
 .health-pane input[type=date]::-webkit-calendar-picker-indicator{opacity:0;position:absolute;inset:0;width:100%;height:100%;cursor:pointer}
 .health-pane input[type=date]{position:relative}
+
+.segmented.meal-slots{display:grid;grid-auto-flow:row;grid-template-columns:repeat(4,1fr);grid-auto-columns:unset}
+.segmented.meal-slots button{min-height:40px;font-size:13px}
+.look-block{margin:0 0 10px}
+.look-block .label{font-size:12px;font-weight:700;color:var(--ink-500);margin-bottom:6px}
+.look-picks{display:flex;flex-wrap:wrap;gap:6px}
+.look-picks .chip,button.chip{border:0;border-radius:999px;min-height:32px;padding:0 12px;background:var(--surface-2);box-shadow:inset 0 0 0 1.5px var(--line);font:inherit;font-size:13px;font-weight:700;color:var(--ink-700);cursor:pointer}
+.look-picks .chip.on,button.chip.on{background:var(--mint-50);color:var(--mint-700);box-shadow:inset 0 0 0 1.5px var(--mint-500)}
+.vit-row button.need{box-shadow:inset 0 0 0 1.5px var(--gold-600)}
+.coach-card .coach-tip{padding:8px 0;border-bottom:1px solid var(--line);font-size:14px;line-height:20px;color:var(--ink-900)}
+.coach-card .coach-tip:last-of-type{border-bottom:0}
+.coach-week{margin-top:10px;padding-top:8px;border-top:1px solid var(--line);font-size:13px;line-height:18px;color:var(--ink-700)}
+.coach-week b{display:block;margin-bottom:4px;color:var(--ink-900)}
+.cam-pane{position:fixed;inset:0;z-index:26;background:rgba(20,26,51,.45);overflow:auto;padding:12px 0 24px}
+.cam-box{position:relative;border-radius:20px;overflow:hidden;background:#111;aspect-ratio:1;max-height:70vw}
+.cam-box video,.cam-box img,.cam-box canvas{width:100%;height:100%;object-fit:cover;display:block}
+.cam-box video{transform:scaleX(-1)}
+
+.banner.banner.warn .list-row,.banner.banner.flat .list-row{border-bottom:1px solid rgba(0,0,0,.06);align-items:flex-start}
+.banner .list-row .m span{white-space:normal;overflow:visible;text-overflow:unset}

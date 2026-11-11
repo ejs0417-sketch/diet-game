@@ -1,4 +1,4 @@
-// 다이어트 게임 0.3.0 — 기본 체형 3D 아바타 (three.js, 오프라인 번들)
+// 다이어트 게임 0.4.4 — 기본 체형 3D 아바타 (three.js, 오프라인 번들, 피부·머리·얼굴형)
 // 키 186cm 고정. 체중 113~86kg 사이 7개 기준 단계를 연속 보간해서 배·허리·팔·다리·볼 두께만 바뀐다.
 // 얼굴 사진은 localStorage(dg_face_v1)에서만 읽고, 어디에도 보내지 않는다.
 import * as T from './vendor/three.custom.min.js';
@@ -14,9 +14,19 @@ export function shapeOf(kg){
 const L=(a,b,f)=>a+(b-a)*f;
 const LEGUP=.07;
 const COL={skin:0xf6c9a4,shirt:0x8fdcbc,star:0xf37b72,shorts:0x8e949a,shoe:0xffffff,sole:0xdde3e0,hair:0x2b2522,eye:0x2a211d,blush:0xf7a39b,ped:0xbfe9d4,pedTop:0xd8f3e6};
+const SKIN_HEX={light:0xf8d7c4,warm:0xf6c9a4,medium:0xc6865b,tan:0xa0643c,deep:0x6b3d26};
+const HAIR_HEX={black:0x1a1412,darkbrown:0x2b2522,brown:0x5a3a22,auburn:0x6b2e1f,blonde:0xc6a15b,gray:0x8a8680};
+const FACE_SCALE={oval:{x:1,y:1.04,z:1,jaw:1},round:{x:1.1,y:.98,z:1.06,jaw:1.06},long:{x:.92,y:1.14,z:.96,jaw:.92},square:{x:1.06,y:1.0,z:1.02,jaw:1.14}};
+const LOOK_DEF={skin:'warm',hairColor:'darkbrown',hairStyle:'short',faceShape:'oval'};
+function readFaceStore(){
+  try{const s=localStorage.getItem('dg_face_v1');if(!s)return null;
+    if(s.startsWith('data:'))return {photo:s};
+    const o=JSON.parse(s);return o&&typeof o==='object'?o:null;}catch(e){return null;}
+}
+function lookFromStore(){const o=readFaceStore()||{};return Object.assign({},LOOK_DEF,{skin:o.skin||LOOK_DEF.skin,hairColor:o.hairColor||LOOK_DEF.hairColor,hairStyle:o.hairStyle||LOOK_DEF.hairStyle,faceShape:o.faceShape||LOOK_DEF.faceShape,photo:o.photo||null});}
 
 let renderer=null,scene,camera,root,body=null,ghost=null,failed=false,gScene,gRoot,gDepth,gColor;
-let state={kg:113,ghostKg:null,face:null},faceTex=null;
+let state={kg:113,ghostKg:null,face:null},faceTex=null,look=Object.assign({},LOOK_DEF);
 let host=null,rotY=0.35,drag=null,lastT=0,raf=0,idleSpeed=0.35,ro=null,dirty=true;
 const mats={};
 function mat(name,opts){return mats[name]||(mats[name]=new T.MeshStandardMaterial(Object.assign({roughness:.85,metalness:0},opts)));}
@@ -30,10 +40,12 @@ function sph(r,m,ws=20,hs=14){return new T.Mesh(new T.SphereGeometry(r,ws,hs),m)
 function limb(g,a,b,r,m){const d=new T.Vector3().subVectors(b,a),len=d.length();const c=cap(r,Math.max(0.001,len),m);
   c.position.copy(a).addScaledVector(d,.5);c.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),d.normalize());g.add(c);return c;}
 
-function buildBody(f,isGhost){
+function buildBody(f,isGhost,lk){lk=lk||look||LOOK_DEF;
   const g=new T.Group();
+  const skinC=SKIN_HEX[lk.skin]||COL.skin,hairC=HAIR_HEX[lk.hairColor]||COL.hair;
   const M=isGhost?{skin:ghostMat(),shirt:ghostMat(),shorts:ghostMat(),shoe:ghostMat(),hair:ghostMat(),sole:ghostMat()}:
-    {skin:mat('skin',{color:COL.skin}),shirt:mat('shirt',{color:COL.shirt}),shorts:mat('shorts',{color:COL.shorts}),shoe:mat('shoe',{color:COL.shoe,roughness:.6}),sole:mat('sole',{color:COL.sole}),hair:mat('hair',{color:COL.hair,roughness:.7})};
+    {skin:mat('skin',{color:skinC}),shirt:mat('shirt',{color:COL.shirt}),shorts:mat('shorts',{color:COL.shorts}),shoe:mat('shoe',{color:COL.shoe,roughness:.6}),sole:mat('sole',{color:COL.sole}),hair:mat('hair',{color:hairC,roughness:.7})};
+  if(!isGhost){if(M.skin.color)M.skin.color.setHex(skinC);if(M.hair.color)M.hair.color.setHex(hairC);}
   // 치수 (키 고정: 모든 y 위치는 f와 무관)
   const legX=L(.105,.165,f), shin=L(.066,.098,f), thigh=L(.085,.15,f);
   const waist=L(.21,.34,f), belly=L(.215,.40,f), chest=L(.235,.33,f), shoulder=L(.25,.31,f);
@@ -67,16 +79,28 @@ function buildBody(f,isGhost){
   // 목·머리
   const nk=new T.Mesh(new T.CylinderGeometry(L(.07,.095,f),L(.08,.11,f),.1,14),M.skin);nk.position.y=1.36;U.add(nk);
   const head=new T.Group();head.position.y=1.56;U.add(head);
-  const HR=.2, cheek=L(1.0,1.12,f);
-  const hd=sph(HR,M.skin,28,20);hd.scale.set(cheek,1.04,1.0);head.add(hd);
-  // 볼살(아래쪽 볼륨)
-  if(f>0.05){const jw=sph(HR*.8,M.skin,20,12);jw.scale.set(cheek*1.1,.7,.95);jw.position.set(0,-.07,.02);head.add(jw);}
+  const HR=.2, cheek=L(1.0,1.12,f), fs=FACE_SCALE[lk.faceShape]||FACE_SCALE.oval;
+  const hd=sph(HR,M.skin,28,20);hd.scale.set(cheek*fs.x,fs.y,fs.z);head.add(hd);
+  // 볼살(아래쪽 볼륨) — 둥근·각진 얼굴은 아래를 조금 더
+  if(f>0.05||fs.jaw>1.02){const jw=sph(HR*.8,M.skin,20,12);jw.scale.set(cheek*1.1*fs.jaw,.7*(lk.faceShape==='square'?1.15:.95),.95);jw.position.set(0,lk.faceShape==='long'?-.09:-.07,.02);head.add(jw);}
   // 귀
-  for(const s of [-1,1]){const e=sph(.045,M.skin,12,8);e.scale.set(.6,1,.8);e.position.set(s*HR*cheek*.98,-.01,0);head.add(e);}
-  // 머리카락: 위쪽 캡 + 앞머리
-  const hair=new T.Mesh(new T.SphereGeometry(HR*1.06,28,14,0,Math.PI*2,0,Math.PI*.42),M.hair);hair.scale.set(cheek*.99,1.05,1.02);hair.position.y=.012;head.add(hair);
-  const back=new T.Mesh(new T.SphereGeometry(HR*1.05,24,14,Math.PI*1.1,Math.PI*.8,0,Math.PI*.62),M.hair);back.scale.set(cheek*.99,1.02,1.02);head.add(back);
-  for(const [x,,rz] of [[-.07,0,.5],[.0,0,0],[.075,0,-.5]]){const fr=sph(.07,M.hair,12,8);fr.scale.set(1.2,.55,.7);fr.position.set(x,.135,.135);fr.rotation.z=rz;head.add(fr);}
+  for(const s of [-1,1]){const e=sph(.045,M.skin,12,8);e.scale.set(.6,1,.8);e.position.set(s*HR*cheek*fs.x*.98,-.01,0);head.add(e);}
+  // 머리카락
+  const style=lk.hairStyle||'short';
+  if(style==='buzz'){
+    const hair=new T.Mesh(new T.SphereGeometry(HR*1.02,28,14,0,Math.PI*2,0,Math.PI*.5),M.hair);hair.scale.set(cheek*fs.x*.99,fs.y*.92,fs.z*1.0);hair.position.y=.006;head.add(hair);
+  }else{
+    const capH=style==='curly'?Math.PI*.5:Math.PI*.42;
+    const hair=new T.Mesh(new T.SphereGeometry(HR*(style==='curly'?1.1:1.06),28,14,0,Math.PI*2,0,capH),M.hair);hair.scale.set(cheek*fs.x*.99,fs.y*(style==='curly'?1.12:1.05),fs.z*1.02);hair.position.y=.012;head.add(hair);
+    const back=new T.Mesh(new T.SphereGeometry(HR*1.05,24,14,Math.PI*1.1,Math.PI*.8,0,Math.PI*.62),M.hair);back.scale.set(cheek*fs.x*.99,fs.y*1.02,fs.z*1.02);head.add(back);
+    if(style==='side'){
+      const fr=sph(.075,M.hair,12,8);fr.scale.set(1.4,.5,.7);fr.position.set(-.08,.13,.13);fr.rotation.z=.7;head.add(fr);
+    }else if(style==='curly'){
+      for(const [x,y,z] of [[-.09,.16,.08],[.0,.2,.1],[.09,.16,.08],[-.06,.14,.14],[.06,.14,.14]]){const c=sph(.055,M.hair,10,8);c.position.set(x,y,z);head.add(c);}
+    }else{
+      for(const [x,,rz] of [[-.07,0,.5],[.0,0,0],[.075,0,-.5]]){const fr=sph(.07,M.hair,12,8);fr.scale.set(1.2,.55,.7);fr.position.set(x,.135,.135);fr.rotation.z=rz;head.add(fr);}
+    }
+  }
   if(!isGhost){
     // 기본 얼굴
     const face=new T.Group();face.name='face';head.add(face);
@@ -87,7 +111,7 @@ function buildBody(f,isGhost){
     const mouth=new T.Mesh(new T.TorusGeometry(.035,.009,6,16,Math.PI),mat('mouth',{color:0xb8524a}));mouth.rotation.z=Math.PI;mouth.position.set(0,-.06,HR*.97);face.add(mouth);
     // 사진 얼굴(구면 패치)
     const patch=new T.Mesh(new T.SphereGeometry(HR*1.012,24,16,Math.PI/2-.8,1.6,Math.PI*.30,Math.PI*.47),
-      new T.MeshStandardMaterial({transparent:true,roughness:.9,map:null}));patch.name='photo';patch.scale.set(cheek,1.04,1.0);patch.visible=false;head.add(patch);
+      new T.MeshStandardMaterial({transparent:true,roughness:.9,map:null}));patch.name='photo';patch.scale.set(cheek*fs.x,fs.y,fs.z);patch.visible=false;head.add(patch);
   }
   return g;
 }
@@ -102,10 +126,10 @@ function applyFace(){if(!body)return;const p=body.getObjectByName('photo'),f=bod
   if(faceTex){p.material.map=faceTex;p.material.emissiveMap=faceTex;p.material.emissive.set(0xffffff);p.material.emissiveIntensity=.35;p.material.needsUpdate=true;p.visible=true;f.visible=false;}else{p.visible=false;f.visible=true;}}
 
 function rebuild(){if(!scene)return;
-  if(body){root.remove(body);disposeTree(body);} body=buildBody(shapeOf(state.kg),false);root.add(body);applyFace();
+  if(body){root.remove(body);disposeTree(body);} body=buildBody(shapeOf(state.kg),false,look);root.add(body);applyFace();
   if(ghost){gRoot.remove(ghost);disposeTree(ghost);ghost=null;}
   // 예측이 지금보다 가벼울 때만: 더 날씬한 예상 체형을 반투명으로 몸 위에 겹쳐 그림
-  if(state.ghostKg!=null&&shapeOf(state.ghostKg)<shapeOf(state.kg)-.01){ghost=buildBody(shapeOf(state.ghostKg),true);gRoot.add(ghost);}
+  if(state.ghostKg!=null&&shapeOf(state.ghostKg)<shapeOf(state.kg)-.01){ghost=buildBody(shapeOf(state.ghostKg),true,look);gRoot.add(ghost);}
   dirty=true;}
 
 function init(){if(renderer||failed)return !failed;
@@ -130,7 +154,8 @@ function init(){if(renderer||failed)return !failed;
   cv.addEventListener('pointermove',e=>{if(drag){rotY=drag.r+(e.clientX-drag.x)*.012;dirty=true;}});
   const up=()=>{drag=null;cv.style.cursor='grab';};cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',up);
   document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();else start();});
-  const s=localStorage.getItem('dg_face_v1');if(s)makeFaceTexture(s,t=>{faceTex=t;applyFace();dirty=true;});
+  const st=lookFromStore();look=Object.assign({},LOOK_DEF,st);
+  if(st&&st.photo)makeFaceTexture(st.photo,t=>{faceTex=t;applyFace();dirty=true;});
   rebuild();return true;}
 
 function frame(){if(!host)return;
@@ -165,6 +190,9 @@ const api={
   setWeight(kg,ghostKg){if(failed||!scene)return;state.kg=kg;state.ghostKg=ghostKg??null;rebuild();},
   setFace(url){if(failed||!scene)return;if(!url){if(faceTex)faceTex.dispose();faceTex=null;applyFace();dirty=true;return;}
     makeFaceTexture(url,t=>{if(faceTex)faceTex.dispose();faceTex=t;applyFace();dirty=true;});},
+  setLook(o){look=Object.assign({},LOOK_DEF,look,o||{});if(!failed&&scene)rebuild();},
+  getLook(){return Object.assign({},look);},
+  SKIN_HEX,HAIR_HEX,FACE_SCALE,LOOK_DEF,
   setRotation(r){rotY=r;dirty=true;},
 };
 window.DGAvatar=api;
