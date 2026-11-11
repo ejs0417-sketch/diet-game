@@ -39,7 +39,7 @@ has('냉면', h=>h.item.id==='mul-naengmyeon'||h.item.id==='bibim-naengmyeon', '
 const jj=search.searchFoods('짜장면',{foods:foods.FOODS,limit:5})[0];
 assert.ok(jj && jj.item.kcal>=700 && jj.item.unit==='1인분', '짜장면 kcal 1인분');
 
-assert.strictEqual(foods.count, 230, '음식 230개 (기존 208 + 과일 22)');
+assert.strictEqual(foods.count, 283, '음식 283개 (기존 230 + 프랜차이즈 공식 53)');
 
 // 짧은 한글 검색이 초성 오탐으로 엉뚱한 메뉴를 넣지 않아요
 const kimchi=names('김치');
@@ -130,4 +130,58 @@ console.log('0.4.10 brand-search tests ok', {봉구스:names('봉구스').slice(
   assert.strictEqual(foods.nutritionForPlace({kcal:10,home:{kcal:8}},'home').kcal, 8);
   assert.strictEqual(foods.nutritionForPlace({kcal:10},'home').kcal, 10, '집밥 전용값 없으면 동일');
   console.log('0.4.13 fruit-search tests ok', {홍시:names('홍시').slice(0,3), 귤:names('귤').slice(0,3), 샤인:names('샤인').slice(0,3)});
+}
+
+// 0.4.14 프랜차이즈 공식 메뉴·별칭
+{
+  const chicken=names('치킨');
+  assert.ok(/치킨/.test(chicken[0]) && chicken[0].includes('후라이드'), "'치킨' 첫 결과는 대표 치킨: "+chicken[0]);
+  assert.ok(!chicken.some(x=>/교촌|BBQ|롯데리아|도미노/.test(x)), "'치킨' 일반 검색에 브랜드 전용 메뉴가 끼어들면 안 됨: "+chicken.join(', '));
+  const pizza=names('피자');
+  assert.ok(pizza[0].includes('피자'), "'피자' 첫 결과는 피자: "+pizza[0]);
+  assert.ok(!pizza.some(x=>/도미노/.test(x)), "'피자' 일반 검색에 도미노가 끼어들면 안 됨: "+pizza.join(', '));
+
+  has('교촌', h=>h.item.brand==='교촌치킨'&&h.item.id==='kyochon-ganjang', '교촌');
+  const kyo=search.searchFoods('교촌',{foods:foods.FOODS,limit:20});
+  assert.ok(kyo.length>=6 && kyo.every(h=>h.item.brand==='교촌치킨'), '교촌 결과는 교촌 브랜드');
+  assert.ok(kyo.every(h=>h.item.unit==='100g'), '교촌은 100g 단위');
+  const honey=kyo.find(h=>h.item.id==='kyochon-honey');
+  assert.ok(honey && honey.item.kcal===330 && honey.item.protein===21 && honey.item.carbs==null && honey.item.fat==null, '교촌 허니 330kcal, 탄수·지방 비움');
+  has('교촌허니', h=>h.item.id==='kyochon-honey', '별칭 교촌허니');
+  has('ㄱㅊㅊㅋ', h=>h.item.brand==='교촌치킨', '초성 ㄱㅊㅊㅋ → 교촌치킨');
+
+  has('BBQ', h=>h.item.id==='bbq-goldolive', 'BBQ');
+  has('비비큐', h=>h.item.brand==='BBQ', '비비큐');
+  has('황금올리브', h=>h.item.id==='bbq-goldolive'&&Math.abs(h.item.kcal-253.72)<0.001, '황금올리브 253.72kcal/100g');
+  has('자메이카', h=>h.item.id==='bbq-jamaica', '자메이카 통다리');
+  has('ㅂㅂㅋ', h=>h.item.brand==='BBQ', '초성 ㅂㅂㅋ → BBQ');
+  const gold=foods.FOODS.find(f=>f.id==='bbq-goldolive');
+  assert.ok(gold && gold.carbs==null && gold.fat==null && gold.unit==='100g', 'BBQ 탄수·지방 비움, 100g');
+
+  has('롯데리아', h=>h.item.brand==='롯데리아'&&h.item.id==='lot-hanwoo', '롯데리아');
+  const han=search.searchFoods('한우불고기',{foods:foods.FOODS,limit:8}).find(h=>h.item.id==='lot-hanwoo');
+  assert.ok(han && han.item.kcal===572 && han.item.grams===263 && han.item.unit==='1개' && han.item.protein===23, '한우불고기버거 572kcal/263g');
+  has('빅불', h=>h.item.id==='lot-ria-bulgogi-double', '빅불');
+  has('리아새우', h=>h.item.id==='lot-ria-shrimp', '리아 새우');
+  has('ㄹㄷㄹㅇ', h=>h.item.brand==='롯데리아', '초성 ㄹㄷㄹㅇ → 롯데리아');
+  const lotHits=search.searchFoods('롯데리아',{foods:foods.FOODS,limit:40});
+  assert.ok(lotHits.filter(h=>h.item.brand==='롯데리아').length>=20, '롯데리아 메뉴가 충분히 검색됨');
+
+  has('도미노', h=>h.item.brand==='도미노피자'&&h.item.id==='domino-pepper-l', '도미노');
+  const pep=search.searchFoods('도미노 페퍼로니',{foods:foods.FOODS,limit:8})[0];
+  assert.ok(pep && pep.item.id==='domino-pepper-l' && pep.item.kcal===2320 && pep.item.grams===854 && pep.item.unit==='1판(오리지널 L)', '도미노 페퍼로니 L 2320kcal');
+  has('ㄷㅁㄴ', h=>h.item.brand==='도미노피자', '초성 ㄷㅁㄴ → 도미노');
+
+  has('페퍼로니피자', h=>h.item.id==='pepper-p'||h.item.id==='pepper-s', '페퍼로니피자 → 기존 일반 메뉴');
+  assert.ok(['pepper-p','pepper-s'].includes(ids('페퍼로니피자')[0]), '페퍼로니피자 첫 결과는 일반 메뉴');
+  has('옛날통닭', h=>h.item.id==='fried-w', '별칭 옛날통닭 → 후라이드');
+  has('닭강정', h=>h.item.id==='sunsal-y-w', '닭강정 → 양념 순살');
+  has('싸이버거', h=>h.item.id==='chicken-burger', '싸이버거 → 치킨버거 별칭');
+  has('임실치즈피자', h=>h.item.id==='cheese-p', '임실치즈피자 → 치즈 피자');
+  has('네네', h=>h.item.id==='fried-w', '네네 → 일반 후라이드 별칭(전용 수치 없음)');
+  has('피자스쿨', h=>h.item.id==='combo-p', '피자스쿨 → 콤비네이션 피자 별칭');
+
+  const branded=foods.FOODS.filter(f=>['교촌치킨','BBQ','롯데리아','도미노피자'].includes(f.brand));
+  assert.strictEqual(branded.length, 53, '공식 프랜차이즈 53개');
+  console.log('0.4.14 brand-search tests ok', {교촌:names('교촌').slice(0,3), BBQ:names('BBQ').slice(0,3), 롯데리아:names('롯데리아').slice(0,3), 도미노:names('도미노').slice(0,4), 치킨:chicken.slice(0,3), 피자:pizza.slice(0,3)});
 }

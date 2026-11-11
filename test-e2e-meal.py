@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""0.4.13 E2E: version badge, 집밥 chips, fruit search, consecutive search, short viewport, SW update."""
+"""0.4.14 E2E: franchise chicken/pizza search, version badge, 집밥, consecutive search, short viewport, SW update."""
 from __future__ import annotations
 import http.server, json, os, socket, sys, threading, time
 from functools import partial
@@ -7,10 +7,11 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent
-SHOT_DIR = Path('/tmp/e2e-0.4.13')
-FINAL_SHOT = Path('/workspace/다이어트게임-0.4.13-집밥선택.png')
-HOME_SHOT = Path('/workspace/다이어트게임-0.4.13-버전표시.png')
-FRUIT_SHOT = Path('/workspace/다이어트게임-0.4.13-과일검색.png')
+SHOT_DIR = Path('/tmp/e2e-0.4.14')
+FINAL_SHOT = Path('/workspace/다이어트게임-0.4.14-집밥선택.png')
+HOME_SHOT = Path('/workspace/다이어트게임-0.4.14-버전표시.png')
+FRUIT_SHOT = Path('/workspace/다이어트게임-0.4.14-과일검색.png')
+CHICKEN_PIZZA_SHOT = Path('/workspace/다이어트게임-0.4.14-치킨피자검색.png')
 OLD_DIR = Path('/tmp/dg-0.4.10')
 UA = ('Mozilla/5.0 (Linux; Android 16; SM-F766N) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36')
@@ -185,10 +186,10 @@ def main():
             browser,ctx,page=launch(p,412,915)
             guest(page,url)
             ver=page.evaluate('()=>typeof VERSION!=="undefined"?VERSION:null')
-            if ver!='0.4.13':
-                FAILS.append(f'로컬 버전이 0.4.13가 아님: {ver}')
+            if ver!='0.4.14':
+                FAILS.append(f'로컬 버전이 0.4.14가 아님: {ver}')
             badge=page.locator('.ver-badge')
-            if badge.count()==0 or 'v0.4.13' not in badge.first.inner_text():
+            if badge.count()==0 or 'v0.4.14' not in badge.first.inner_text():
                 FAILS.append(f'홈 버전 배지 없음: {badge.count()}')
             page.wait_for_timeout(400)
             page.screenshot(path=str(HOME_SHOT))
@@ -197,7 +198,7 @@ def main():
             page.wait_for_selector('#mealMenu', timeout=8000)
             page.wait_for_timeout(200)
             assert_search_visible(page, 'fresh-nav enter', 'fresh-nav-enter')
-            if page.locator('.log-head .ver-badge', has_text='v0.4.13').count()==0:
+            if page.locator('.log-head .ver-badge', has_text='v0.4.14').count()==0:
                 FAILS.append('기록 헤더 버전 배지 없음')
             # 과일 검색 스크린샷
             inp=page.locator('#mealMenu')
@@ -210,6 +211,52 @@ def main():
             page.wait_for_timeout(300)
             page.screenshot(path=str(FRUIT_SHOT))
             log('FRUIT_SHOT', FRUIT_SHOT)
+            inp.fill('')
+            page.wait_for_timeout(150)
+            # 치킨·피자(교촌·도미노) 검색 스크린샷
+            inp.fill('교촌')
+            page.wait_for_selector('.meal-search-item', timeout=6000)
+            kyo=page.locator('.meal-search-item').first.inner_text()
+            if '간장한마리' not in kyo and '교촌' not in kyo:
+                FAILS.append(f'교촌 검색 결과 이상: {kyo}')
+            page.wait_for_timeout(250)
+            chick_path=SHOT_DIR/'kyochon-search.png'
+            page.screenshot(path=str(chick_path))
+            # 일반 치킨 첫 결과 확인
+            inp.fill('')
+            inp.fill('치킨')
+            page.wait_for_selector('.meal-search-item', timeout=6000)
+            first=page.locator('.meal-search-item').first.inner_text()
+            if '후라이드' not in first:
+                FAILS.append(f'치킨 첫 결과가 후라이드가 아님: {first}')
+            page.wait_for_timeout(200)
+            generic_path=SHOT_DIR/'chicken-generic.png'
+            page.screenshot(path=str(generic_path))
+            inp.fill('')
+            inp.fill('도미노')
+            page.wait_for_selector('.meal-search-item', timeout=6000)
+            dom=page.locator('.meal-search-item').first.inner_text()
+            if '피자' not in dom:
+                FAILS.append(f'도미노 검색 결과 이상: {dom}')
+            page.wait_for_timeout(250)
+            pizza_path=SHOT_DIR/'domino-search.png'
+            page.screenshot(path=str(pizza_path))
+            # 두 장을 세로로 이어 공식 스크린샷
+            try:
+                from PIL import Image
+                a=Image.open(chick_path)
+                b=Image.open(pizza_path)
+                w=max(a.width,b.width)
+                canv=Image.new('RGB',(w,a.height+b.height),(255,255,255))
+                canv.paste(a,(0,0))
+                canv.paste(b,(0,a.height))
+                canv.save(CHICKEN_PIZZA_SHOT)
+            except Exception as ex:
+                # 이어 붙이기에 실패하면 교촌 검색 화면을 그대로 씀
+                import shutil
+                shutil.copy(chick_path, CHICKEN_PIZZA_SHOT)
+                log('WARN collage', type(ex).__name__, ex)
+            log('CHICKEN_PIZZA_SHOT', CHICKEN_PIZZA_SHOT)
             inp.fill('')
             page.wait_for_timeout(150)
             # 집밥 선택 후 3개 연속 추가
@@ -294,9 +341,9 @@ def main():
             add_three(page, 'slot-점저', '점저')
             browser.close()
 
-            # 7) SW 0.4.10 캐시: 첫 기록은 홈으로 나감(옛 버그). 서버를 0.4.13로 바꾼 뒤
+            # 7) SW 0.4.10 캐시: 첫 기록은 홈으로 나감(옛 버그). 서버를 0.4.14로 바꾼 뒤
             #    update()를 시도하고, 0.4.10 페이지에는 자동새로고침이 없으므로
-            #    한 번 새로고침(앱을 다시 연 것과 같음, network-first) 후 0.4.13 연속 추가를 확인.
+            #    한 번 새로고침(앱을 다시 연 것과 같음, network-first) 후 0.4.14 연속 추가를 확인.
             httpd.legacy = True
             browser,ctx,page=launch(p,412,915)
             guest(page, url)
@@ -319,7 +366,7 @@ def main():
             except Exception as e:
                 log('update() call', type(e).__name__, e)
             try:
-                page.wait_for_function('() => typeof VERSION!=="undefined" && VERSION==="0.4.13"', timeout=4000)
+                page.wait_for_function('() => typeof VERSION!=="undefined" && VERSION==="0.4.14"', timeout=4000)
             except Exception:
                 page.reload(wait_until='domcontentloaded', timeout=20000)
             page.wait_for_timeout(500)
@@ -329,8 +376,8 @@ def main():
             ver2=page.evaluate('()=>typeof VERSION!=="undefined"?VERSION:null')
             log('SW after update/reload VERSION', ver2)
             page.screenshot(path=str(SHOT_DIR/'sw-updated-home.png'))
-            if ver2!='0.4.13':
-                FAILS.append(f'SW 업데이트 후 버전이 0.4.13가 아님: {ver2}')
+            if ver2!='0.4.14':
+                FAILS.append(f'SW 업데이트 후 버전이 0.4.14가 아님: {ver2}')
             else:
                 deadline=time.time()+12
                 while time.time()<deadline:
@@ -346,11 +393,11 @@ def main():
                 page.locator('nav#nav button', has_text='기록').click()
                 page.wait_for_selector('#mealMenu', timeout=8000)
                 st=assert_search_visible(page, 'sw-updated enter', 'sw-updated-enter')
-                if st.get('version')!='0.4.13' or not st.get('inView'):
+                if st.get('version')!='0.4.14' or not st.get('inView'):
                     FAILS.append(f'sw-updated 기록 화면 검색창 확인 실패 {st}')
             browser.close()
 
-            # 8) 0.4.13 전용 세션에서 sw.js 내용이 바뀌면 자동 새로고침
+            # 8) 0.4.14 전용 세션에서 sw.js 내용이 바뀌면 자동 새로고침
             httpd.legacy = False
             httpd.sw_bump = False
             browser,ctx,page=launch(p,412,915)
@@ -366,13 +413,13 @@ def main():
                     page.wait_for_selector('nav#nav', timeout=20000)
                 ver3=page.evaluate('()=>typeof VERSION!=="undefined"?VERSION:null')
                 log('SW bump auto-reload VERSION', ver3)
-                if ver3!='0.4.13':
-                    FAILS.append(f'0.4.13 자동새로고침 후 버전 이상: {ver3}')
+                if ver3!='0.4.14':
+                    FAILS.append(f'0.4.14 자동새로고침 후 버전 이상: {ver3}')
                 else:
                     log('SW bump auto-reload OK')
             except Exception as e:
                 log('SW bump auto-nav', type(e).__name__, e)
-                log('WARN: 0.4.13 자동새로고침이 이 환경에서 확인되지 않음 (코드는 index.html controllerchange + sw navigate 유지)')
+                log('WARN: 0.4.14 자동새로고침이 이 환경에서 확인되지 않음 (코드는 index.html controllerchange + sw navigate 유지)')
             browser.close()
 
     finally:
@@ -383,11 +430,11 @@ def main():
         for f in FAILS:
             log(' -', f)
         sys.exit(1)
-    missing=[p for p in (FINAL_SHOT, HOME_SHOT, FRUIT_SHOT) if not p.exists()]
+    missing=[p for p in (FINAL_SHOT, HOME_SHOT, FRUIT_SHOT, CHICKEN_PIZZA_SHOT) if not p.exists()]
     if missing:
         log('E2E FAIL: 스크린샷 없음', *[str(p) for p in missing])
         sys.exit(1)
-    log('E2E OK', FINAL_SHOT, HOME_SHOT, FRUIT_SHOT)
+    log('E2E OK', FINAL_SHOT, HOME_SHOT, FRUIT_SHOT, CHICKEN_PIZZA_SHOT)
     sys.exit(0)
 
 if __name__=='__main__':

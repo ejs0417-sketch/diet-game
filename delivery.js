@@ -20,8 +20,9 @@ function addDays(date,n){
   return new Date(u).toISOString().slice(0,10);
 }
 function scaleNut(nut,k){
+  const keep=(v,fn)=>{if(v==null||v==='')return '';return fn(v);};
   const r=x=>Math.round((+x||0)*k*10)/10;
-  return {kcal:Math.round((+nut.kcal||0)*k),protein:r(nut.protein),carbs:r(nut.carbs),fat:r(nut.fat),sodium:Math.round((+nut.sodium||0)*k)};
+  return {kcal:keep(nut.kcal,v=>Math.round((+v||0)*k)),protein:keep(nut.protein,r),carbs:keep(nut.carbs,r),fat:keep(nut.fat,r),sodium:keep(nut.sodium,v=>Math.round((+v||0)*k))};
 }
 function addNut(a,b){
   return {kcal:(+a.kcal||0)+(+b.kcal||0),protein:(+a.protein||0)+(+b.protein||0),carbs:(+a.carbs||0)+(+b.carbs||0),fat:(+a.fat||0)+(+b.fat||0),sodium:(+a.sodium||0)+(+b.sodium||0)};
@@ -107,16 +108,22 @@ function optionAdds(options,itemName){
 }
 function optionMultiplier(options,itemName){return optionAdds(options,itemName);}
 function applyPortion(dish,qty,portion,options){
-  if(!dish)return {kcal:0,protein:0,carbs:0,fat:0,sodium:0};
+  if(!dish)return {kcal:'',protein:'',carbs:'',fat:'',sodium:''};
   const {m,add}=optionAdds(options,dish.name);
   const k=(qty||1)*(portion||1)*m;
   const r=x=>Math.round(x*10)/10;
+  const scale=(val,extra,roundFn)=>{
+    const has=!(val==null||val==='');
+    const extraHas=!!(+extra);
+    if(!has&&!extraHas)return '';
+    return roundFn((has?+val:0)*k+(+extra||0));
+  };
   return {
-    kcal:Math.round((dish.kcal||0)*k+add.kcal),
-    protein:r((dish.protein||0)*k+add.protein),
-    carbs:r((dish.carbs||0)*k+add.carbs),
-    fat:r((dish.fat||0)*k+add.fat),
-    sodium:Math.round((dish.sodium||0)*k+add.sodium)
+    kcal:scale(dish.kcal,add.kcal,Math.round),
+    protein:scale(dish.protein,add.protein,r),
+    carbs:scale(dish.carbs,add.carbs,r),
+    fat:scale(dish.fat,add.fat,r),
+    sodium:scale(dish.sodium,add.sodium,Math.round)
   };
 }
 

@@ -79,9 +79,9 @@ function foodKeys(item){
   return names.filter(Boolean);
 }
 
-const GENERIC_FOOD_Q=new Set(['치킨','치즈','햄','제육','불고기','오리지널','초코','김치','마요','떡갈비','닭갈비','소불고기']);
-const BRAND_QUERY_TEXT=['봉구스','봉구스밥버거','밥버거','빼빼로','페페로','빼배로','롯데웰푸드','롯데빼빼로'];
-const BRAND_QUERY_CHO=['ㅂㄱㅅ','ㅃㅃㄹ'];
+const GENERIC_FOOD_Q=new Set(['치킨','치즈','햄','제육','불고기','오리지널','초코','김치','마요','떡갈비','닭갈비','소불고기','피자','버거','후라이드','양념치킨','간장치킨','순살치킨']);
+const BRAND_QUERY_TEXT=['봉구스','봉구스밥버거','밥버거','빼빼로','페페로','빼배로','롯데웰푸드','롯데빼빼로','교촌','교촌치킨','bbq','비비큐','롯데리아','도미노','도미노피자'];
+const BRAND_QUERY_CHO=['ㅂㄱㅅ','ㅃㅃㄹ','ㄱㅊㅊㅋ','ㅂㅂㅋ','ㄹㄷㄹㅇ','ㄷㅁㄴ'];
 
 function isBrandQuery(query){
   const raw=String(query||'').trim();
