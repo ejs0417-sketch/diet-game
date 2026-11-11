@@ -1,4 +1,4 @@
-// 다이어트 게임 0.4.6 — 배달 주문 사진 인식·나눠 먹기·남은 음식 (기기 안, 사진은 저장하지 않음)
+// 다이어트 게임 0.4.8 — 배달 주문 사진 인식·나눠 먹기·남은 음식·메뉴 검색 연결 (기기 안, 사진은 저장하지 않음)
 (function(root){
 const DISCLAIMER='건강 정보는 참고용이에요. 진단이 아니며, 정확한 판단은 의사에게 받으세요.';
 const PRIVACY='사진은 이 폰 안에서만 읽고, 어디에도 올리지 않아요. 인식이 끝나면 사진을 저장하지 않아요.';
@@ -518,10 +518,9 @@ function confirmHTML(d){
   const peopleBtns=PEOPLE_CHOICES.map(n=>`<button type="button" aria-selected="${people===n&&!d.peoplePlus}" onclick="DGDelivery.setPeople(${n})">${n}</button>`).join('')
     +`<button type="button" aria-selected="${!!d.peoplePlus||people>6}" onclick="DGDelivery.setPeople(7,true)">6+</button>`;
   return `<div class="health-sheet">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h2 style="margin:0">배달 주문 확인</h2><button type="button" class="btn-ghost btn-sm" onclick="DGDelivery.close()">닫기</button></div>
-    ${note}
-    <p class="muted">${esc(PRIVACY)}</p>
-    <p class="priv-line">${esc(PRIVACY_LINE)}</p>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h2 style="margin:0">${d.source==='search'?'메뉴 기록':'배달 주문 확인'}</h2><button type="button" class="btn-ghost btn-sm" onclick="DGDelivery.close()">닫기</button></div>
+    ${d.source==='search'?'<div class="muted">고른 메뉴예요. 나눠 먹었거나 남겼으면 아래에서 바꿔 주세요.</div>':note}
+    ${d.source==='search'?'':`<p class="muted">${esc(PRIVACY)}</p><p class="priv-line">${esc(PRIVACY_LINE)}</p>`}
     <div class="card">
       ${d.app?`<div class="muted" style="margin-bottom:6px">앱: ${esc(d.app)}</div>`:''}
       <label class="field"><span class="label">가게</span><input class="input" id="dvStore" value="${esc(d.store||'')}" placeholder="가게 이름 (없으면 비워 두세요)"></label>
@@ -595,6 +594,20 @@ function setEaten(i,v){touch(d=>{const r=d.rows[i];if(!r)return;if(v==='custom')
 function setMacro(i,k,v){touch(d=>{const r=d.rows[i];if(!r)return;r[k]=v===''?'':+v;});}
 function recalc(r){refreshRowMacros(r,draft&&draft.people||1);}
 
+
+function openFromSearch(id){
+  const item=foods().find(f=>f.id===id);
+  if(!item){if(typeof toast==='function')toast('메뉴를 찾지 못했어요');return;}
+  const date=(typeof logDate!=='undefined'&&logDate)||(typeof today==='function'?today():'');
+  const slot=(typeof mealKind!=='undefined'&&mealKind)||(typeof suggestMealSlot==='function'?suggestMealSlot(date):'저녁');
+  const row={
+    name:item.name,qty:1,portion:1,shareMode:'people',peopleOverride:null,eatenFrac:1,
+    options:[],dishId:item.id,match:item.name,unit:item.unit,score:100,on:true
+  };
+  refreshRowMacros(row,1);
+  openPane({mode:'confirm',source:'search',app:'',store:'',rows:[row],slot,date,time:'',orderWhen:false,people:1,peoplePlus:false,ocrError:false});
+}
+
 function pick(){
   let inp=$('#delivPick');
   if(!inp){inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.id='delivPick';inp.style.display='none';
@@ -645,7 +658,7 @@ function commitMeals(){
       carbs_g:r.carbs===''||r.carbs==null?'':String(r.carbs),
       fat_g:r.fat===''||r.fat==null?'':String(r.fat),
       sodium_mg:r.sodium===''||r.sodium==null?'':String(r.sodium),
-      kcal_source:r.dishId?'배달메뉴표(대략)':(r.kcal?'직접입력':''),
+      kcal_source:r.dishId?((draft&&draft.source==='search')?'음식표(대략)':'배달메뉴표(대략)'):(r.kcal?'직접입력':''),
       store,portion:r.portion,qty:r.qty,dish_id:r.dishId||'',people,
       eaten:eatenFracOf(r),
       note:[(r.options||[]).join(', '),store?('가게='+store):'',people>1?('나눔='+people+'명'):'',eatenFracOf(r)<1?('먹은양='+Math.round(eatenFracOf(r)*100)+'%'):''].filter(Boolean).join('; ')
@@ -658,8 +671,9 @@ function commitMeals(){
   }
   const n=evs.length,k=evs.reduce((s,e)=>s+(+e.kcal||0),0),p=evs.reduce((s,e)=>s+(+e.protein_g||0),0);
   const leftN=activeLeftovers(date).length;
+  const kind=(draft&&draft.source==='search')?'메뉴':'배달';
   draft=null;const el=$('#delivPane');if(el)el.remove();
-  if(typeof toast==='function')toast(`${slot}에 배달 ${n}개 기록 · ${k}kcal · 단백질 ${Math.round(p)}g`+(leftN?` · 남은 음식 있음`:''));
+  if(typeof toast==='function')toast(`${slot}에 ${kind} ${n}개 기록 · ${k}kcal · 단백질 ${Math.round(p)}g`+(leftN?` · 남은 음식 있음`:''));
   if(typeof render==='function'){if(typeof tab!=='undefined')tab='home';render();}
 }
 
@@ -797,7 +811,7 @@ const api={
   detectApp,parseOrderTime,slotFromWhen,scrubSensitiveText,isPiiLine,shareAndEaten,myShareFrac,addDays,scaleNut,
   todayEaten,eatenTodaySet,sameMenu,rankFavorites,mergeFavs,favList,rememberFav,
   leftoverList,saveLeftovers,mergeLeftovers,activeLeftovers,rememberLeftover,sanitizeLeftover,
-  pick,importFile,openPane,close:closePane,closePane,setSlot,setPeople,toggleRow,removeRow,addRow,
+  pick,openFromSearch,importFile,openPane,close:closePane,closePane,setSlot,setPeople,toggleRow,removeRow,addRow,
   rename,setQty,setPortion,setShareMode,setRowPeople,setEaten,setMacro,save:commitMeals,commitMeals,logFavorite,chipsHTML,leftoversHTML,
   openEatLeft,setEatLeftFrac,commitEatLeft,discardLeftover,consumeShare,bootShare
 };

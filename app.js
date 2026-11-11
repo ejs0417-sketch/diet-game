@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.7 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달)
-const VERSION='0.4.7', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.8 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색)
+const VERSION='0.4.8', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
@@ -320,7 +320,8 @@ function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0
    <button type="button" class="btn-primary btn-lg" onclick="sub('weight')">체중 기록 <span class="stat-chip gold" style="min-height:26px;padding:0 8px;font-size:12px;box-shadow:none">+10 XP</span></button>`,
   meal:`<div class="label" style="font-size:13px;font-weight:700;margin-bottom:6px">끼니</div>
    <div class="segmented meal-slots" data-seg="meal" style="margin-bottom:12px;background:#F3F5FB" role="tablist">${meals.map(m=>`<button type="button" data-k="${m}" aria-selected="${mealKind===m}" onclick="setMealKind('${m}')">${m}</button>`).join('')}</div>
-   <label class="field" style="margin-bottom:10px"><span class="label">메뉴</span><input class="input" id="mealMenu" placeholder="메뉴를 적어 주세요"></label>
+   <label class="field" style="margin-bottom:8px"><span class="label">메뉴 검색</span><input class="input" id="mealMenu" placeholder="짜장면, 치킨, 초성 ㄱㅊㅉㄱ" autocomplete="off" enterkeyhint="search" oninput="if(window.DGFoodSearch)DGFoodSearch.render(this.value)"></label>
+   <div id="mealSearchBox" class="meal-search">${(window.DGFoodSearch?DGFoodSearch.emptyHTML():'')}</div>
    <div class="rowx" style="margin-bottom:14px"><label class="field"><span class="label">kcal <span class="muted">(선택)</span></span><input class="input" id="kcal" type="number" placeholder="예: 520" inputmode="numeric"></label>
    <label class="field"><span class="label">단백질 g <span class="muted">(선택)</span></span><input class="input" id="prot" type="number" placeholder="예: 40" inputmode="numeric"></label></div>
    <button type="button" class="btn-primary btn-lg" onclick="sub('meal')">식사 기록하기 <span class="stat-chip gold" style="min-height:26px;padding:0 8px;font-size:12px;box-shadow:none">+5 XP</span></button>

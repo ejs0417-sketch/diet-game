@@ -1,8 +1,8 @@
-// 다이어트 게임 0.4.6 — 배달 메뉴 영양 대략치 (기기 안 참고용)
+// 다이어트 게임 0.4.8 — 배달·대표 메뉴 영양 대략치 (기기 안 참고용)
 (function(root){
 const SOURCE="값은 표기된 단위(한마리·1판·1인분 등)의 대략치예요. 주로 식품의약품안전처 식품영양성분 데이터베이스의 외식·분식·패스트푸드 대표값을 참고했고, 없는 항목은 같은 분류의 대표 레시피로 환산했어요. 브랜드·양념·양에 따라 달라질 수 있어요.";
 const FOODS=[
-{"id":"fried-w","name":"후라이드 치킨 한마리","aliases":["후라이드치킨","후라이드 한마리","프라이드치킨","후라이드","후치킨"],"cat":"치킨","unit":"한마리","kcal":1800,"protein":120,"carbs":70,"fat":110,"sodium":2400,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
+{"id":"fried-w","name":"후라이드 치킨 한마리","aliases":["후라이드치킨","후라이드 한마리","프라이드치킨","후라이드","후치킨"],"searchAliases":["치킨"],"cat":"치킨","unit":"한마리","kcal":1800,"protein":120,"carbs":70,"fat":110,"sodium":2400,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"fried-hot-w","name":"핫후라이드 치킨 한마리","aliases":["핫후라이드","매운후라이드"],"cat":"치킨","unit":"한마리","kcal":1850,"protein":118,"carbs":72,"fat":112,"sodium":2600,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"yang-w","name":"양념치킨 한마리","aliases":["양념치킨","양념 한마리","양념"],"cat":"치킨","unit":"한마리","kcal":2000,"protein":110,"carbs":140,"fat":110,"sodium":2800,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"ganjang-w","name":"간장치킨 한마리","aliases":["간장치킨","간장 치킨"],"cat":"치킨","unit":"한마리","kcal":1900,"protein":115,"carbs":90,"fat":105,"sodium":3200,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
@@ -109,7 +109,7 @@ const FOODS=[
 {"id":"gomtang","name":"곰탕","aliases":["곰국"],"cat":"국밥탕","unit":"1인분","kcal":380,"protein":26,"carbs":15,"fat":20,"sodium":1500,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"ugeoji","name":"우거지국밥","aliases":["우거지해장국"],"cat":"국밥탕","unit":"1인분","kcal":480,"protein":28,"carbs":22,"fat":24,"sodium":1800,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"rice","name":"쌀밥(공기밥)","aliases":["공기밥","밥추가","흰밥"],"cat":"국밥탕","unit":"1인분","kcal":300,"protein":6,"carbs":67,"fat":0.5,"sodium":5,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
-{"id":"kimchi-jjigae","name":"김치찌개","aliases":["김치찌게"],"cat":"한식","unit":"1인분","kcal":400,"protein":22,"carbs":18,"fat":22,"sodium":1800,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
+{"id":"kimchi-jjigae","name":"김치찌개","aliases":["김치찌게","김치찌개"],"cat":"한식","unit":"1인분","kcal":400,"protein":22,"carbs":18,"fat":22,"sodium":1800,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"doenjang","name":"된장찌개","aliases":["된장찌게"],"cat":"한식","unit":"1인분","kcal":250,"protein":16,"carbs":15,"fat":12,"sodium":1600,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"sundubu","name":"순두부찌개","aliases":["순두부"],"cat":"한식","unit":"1인분","kcal":350,"protein":20,"carbs":12,"fat":20,"sodium":1700,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"budae","name":"부대찌개","aliases":["부대찌게"],"cat":"한식","unit":"1인분","kcal":650,"protein":28,"carbs":40,"fat":35,"sodium":2200,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
@@ -180,6 +180,12 @@ const FOODS=[
 {"id":"softice","name":"소프트아이스크림","aliases":["아이스크림","소프트콘"],"cat":"디저트음료","unit":"1개","kcal":200,"protein":4,"carbs":28,"fat":8,"sodium":80,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"injeolmi","name":"인절미","aliases":["떡디저트","인절미세트"],"cat":"디저트음료","unit":"1개","kcal":220,"protein":5,"carbs":45,"fat":2,"sodium":50,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
 {"id":"danmuji","name":"단무지","aliases":["단무지 접시"],"cat":"디저트음료","unit":"1개","kcal":25,"protein":0,"carbs":6,"fat":0,"sodium":400,"src":"식약처 식품영양성분 DB 외식·분식 대표값 참고"},
+{"id":"mul-naengmyeon","name":"물냉면","aliases":["냉면","물냉","평양냉면"],"cat":"한식","unit":"1인분","kcal":550,"protein":16,"carbs":113,"fat":4,"sodium":2620,"src":"식약처 외식영양성분자료집(2012) 물냉면 1인분(800g) 552kcal 참고"},
+{"id":"bibim-naengmyeon","name":"비빔냉면","aliases":["비냉","매운냉면"],"cat":"한식","unit":"1인분","kcal":620,"protein":20,"carbs":122,"fat":6,"sodium":1660,"src":"식약처 외식영양성분자료집(2012) 비빔냉면 1인분(550g) 623kcal 참고"},
+{"id":"bibim-guksu","name":"비빔국수","aliases":["국수비빔"],"cat":"한식","unit":"1인분","kcal":620,"protein":19,"carbs":110,"fat":12,"sodium":1850,"src":"식약처 외식영양성분자료집(2012) 비빔국수 1인분(550g) 618kcal 참고"},
+{"id":"mandu-guk","name":"만둣국","aliases":["만두국"],"cat":"한식","unit":"1인분","kcal":430,"protein":21,"carbs":48,"fat":17,"sodium":2370,"src":"식약처 외식영양성분자료집(2012) 만둣국 1인분(700g) 434kcal 참고"},
+{"id":"cheonggukjang","name":"청국장찌개","aliases":["청국장","청국장찌게"],"cat":"한식","unit":"1인분","kcal":270,"protein":22,"carbs":10,"fat":16,"sodium":1800,"src":"식약처 외식영양성분자료집(2012) 청국장찌개 1인분(400g) 272kcal 참고"},
+{"id":"hobak-juk","name":"호박죽","aliases":["단호박죽"],"cat":"한식","unit":"1인분","kcal":440,"protein":7,"carbs":89,"fat":6,"sodium":930,"src":"식약처 외식영양성분자료집(2012) 호박죽 1인분(600g) 443kcal 참고"},
 ];
 const api={SOURCE,FOODS,count:FOODS.length};
 root.DGFoods=api;
