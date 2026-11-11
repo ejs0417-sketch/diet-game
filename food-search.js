@@ -216,8 +216,9 @@ function render(query){
   if(!box)return;
   const q=String(query==null?((typeof document!=='undefined'&&document.getElementById('mealMenu'))||{}).value||'':query);
   if(!String(q).trim()){
-    box.innerHTML=emptyHTML();
-    box.hidden=false;
+    const compact=typeof document!=='undefined'&&document.querySelector('.meal-search-dock.compact');
+    if(compact){box.innerHTML='';box.hidden=true;}
+    else{box.innerHTML=emptyHTML();box.hidden=false;}
     return;
   }
   const hits=searchFoods(q,{limit:12});

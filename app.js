@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.11 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색)
-const VERSION='0.4.11', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.12 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색)
+const VERSION='0.4.12', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
@@ -75,6 +75,18 @@ function removeSlotMeal(id){
   const inp=$('#mealMenu');
   if(inp){if(q){inp.value=q;if(window.DGFoodSearch)DGFoodSearch.render(q);}inp.focus();}
 }
+function revealMealSearch(){
+  const inp=$('#mealMenu');
+  if(!inp)return;
+  const dock=$('#mealSearchDock')||inp;
+  const tabH=($('#nav')&&$('#nav').offsetHeight)||68;
+  const vh=window.innerHeight||0;
+  const r=dock.getBoundingClientRect();
+  if(r.top<0||r.bottom>vh-tabH-8){
+    if(dock.scrollIntoView)dock.scrollIntoView({block:'start',behavior:'instant'});
+  }
+  try{inp.focus({preventScroll:true});}catch(e){inp.focus();}
+}
 function restoreMealSearchFocus(){
   if(!wantMealSearchFocus)return;
   wantMealSearchFocus=false;
@@ -82,7 +94,7 @@ function restoreMealSearchFocus(){
   if(!inp)return;
   inp.value='';
   if(window.DGFoodSearch)DGFoodSearch.render('');
-  inp.focus({preventScroll:true});
+  revealMealSearch();
 }
 
 function nv(note,k){const m=(note||'').match(new RegExp(k+'=([0-9.]+)'));return m?+m[1]:null;}
@@ -236,7 +248,12 @@ function questDefs(C){const t=C.days[C.today];const meals=MEALS.filter(m=>t.meal
  {ic:'👟',t:'걷기 40~60분',s:t.rest?'오늘은 통증 휴식':'관절에 무리 없이',p:t.rest?60:Math.min(t.walk,60),max:40,lab:t.rest?'휴식':`${t.walk} / 40~60분`,xp:40,done:t.walk>=40||t.rest},
  {ic:'💧',t:'물 2L 마시기',s:'틈틈이 나눠서',p:t.water,max:2,lab:`${t.water} / 2L`,xp:5,done:t.water>=2}];}
 function qCard(q,bar){const pct=Math.min(100,q.max?q.p/q.max*100:0);const barCls=bar||(q.done?'':'coral');
- return `<div class="quest-card${q.done?' done':''}${q.locked?' locked':''}"><div class="q-ic" style="background:${QICBG[q.ic]||'var(--mint-50)'}">${q.ic}</div><div class="q-body">
+ const go=q.t==='식사 기록하고 마감'?"tab='log';logKind='meal';mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"
+  :q.t==='아침 공복 체중'?"tab='log';logKind='weight';render();"
+  :q.t==='걷기 40~60분'?"tab='log';logKind='exercise';render();"
+  :q.t==='물 2L 마시기'?"tab='log';logKind='water';render();"
+  :'';
+ return `<div class="quest-card${q.done?' done':''}${q.locked?' locked':''}"${go?` role="button" onclick="${go}"`:''}><div class="q-ic" style="background:${QICBG[q.ic]||'var(--mint-50)'}">${q.ic}</div><div class="q-body">
   <div class="q-title">${q.t}</div><div class="q-sub">${q.s}</div>
   <div class="q-prog"><div class="xp-bar on-light ${barCls}"><i style="width:${pct}%"></i></div><span>${q.lab}</span></div>
  </div><div class="q-reward">${q.done?'✓<small>완료</small>':`+${q.xp}<small>XP</small>`}</div></div>`;}
@@ -265,7 +282,7 @@ function home(C){const qs=questDefs(C),show=qs.filter(q=>!q.done).slice(0,3);whi
  </div>
  ${(window.DGHealth?DGHealth.summaryCard():'')}
  </div>`;}
-function quick(){return `<button type="button" onclick="askWeight()"><span class="e">⚖️</span>체중</button><button type="button" onclick="tab='log';logKind='meal';mealKind=suggestMealSlot();render();setTimeout(()=>{const el=$('#mealMenu');if(el)el.focus();},50)"><span class="e">🍱</span>식사</button><button type="button" onclick="addWalk()"><span class="e">👟</span>걷기</button><button type="button" onclick="add({date:today(),type:'water',item:'물',value:'0.5',note:''})"><span class="e">💧</span>물 0.5L</button>`;}
+function quick(){return `<button type="button" onclick="askWeight()"><span class="e">⚖️</span>체중</button><button type="button" onclick="tab='log';logKind='meal';mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"><span class="e">🍱</span>식사</button><button type="button" onclick="addWalk()"><span class="e">👟</span>걷기</button><button type="button" onclick="add({date:today(),type:'water',item:'물',value:'0.5',note:''})"><span class="e">💧</span>물 0.5L</button>`;}
 function normVit(s){return (typeof DGSup!=='undefined'&&DGSup.norm)?DGSup.norm(s):String(s||'').trim();}
 function vitList(){const rawv=Array.isArray(settings.vitamins)?settings.vitamins:['종합비타민'];
  const src=(typeof DGSup!=='undefined'&&DGSup.migrateList)?DGSup.migrateList(rawv):[...new Set(rawv.map(s=>String(s).trim()).filter(Boolean))];
@@ -321,8 +338,13 @@ function setLogKind(k){logKind=k;
  document.querySelectorAll('[data-seg="kind"] button').forEach(b=>{b.setAttribute('aria-selected',b.dataset.k===k?'true':'false');});}
 function setMealKind(k){mealKind=k;
  document.querySelectorAll('[data-seg="meal"] button').forEach(b=>{b.setAttribute('aria-selected',b.dataset.k===k?'true':'false');});
+ const date=($('#dt')&&$('#dt').value)||logDate||today();
  const hold=$('#mealBasket');
- if(hold){const date=($('#dt')&&$('#dt').value)||logDate||today();hold.outerHTML=mealBasketHTML(date,k);}
+ if(hold)hold.outerHTML=mealBasketHTML(date,k);
+ const dock=$('#mealSearchDock');
+ if(dock)dock.classList.toggle('compact',mealsForSlot(date,k).length>0);
+ const inp=$('#mealMenu');
+ if(window.DGFoodSearch)DGFoodSearch.render(inp?inp.value:'');
 }
 function quest(C){const qs=questDefs(C),w=week(C.today),sc=C.strW[w]||0;
  const wk=raw.filter(e=>e.type==='weight'&&week(e.date)===w);
@@ -361,11 +383,13 @@ function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0
  const form={
   weight:`<label class="field" style="margin-bottom:14px"><span class="label">체중(kg)</span><input class="input" id="w" type="number" step="0.1" placeholder="예: 112.5" inputmode="decimal"></label>
    <button type="button" class="btn-primary btn-lg" onclick="sub('weight')">체중 기록 <span class="stat-chip gold" style="min-height:26px;padding:0 8px;font-size:12px;box-shadow:none">+10 XP</span></button>`,
-  meal:`<div class="label" style="font-size:13px;font-weight:700;margin-bottom:6px">끼니</div>
+  meal:`<div id="mealSearchDock" class="meal-search-dock${mealsForSlot(T, mealKind).length?' compact':''}">
+   <div class="label" style="font-size:13px;font-weight:700;margin-bottom:6px">끼니</div>
    <div class="segmented meal-slots" data-seg="meal" style="margin-bottom:12px;background:#F3F5FB" role="tablist">${meals.map(m=>`<button type="button" data-k="${m}" aria-selected="${mealKind===m}" onclick="setMealKind('${m}')">${m}</button>`).join('')}</div>
-   ${mealBasketHTML(T, mealKind)}
    <label class="field" style="margin-bottom:8px"><span class="label">메뉴 검색</span><input class="input" id="mealMenu" placeholder="짜장면, 치킨, 초성 ㄱㅊㅉㄱ" autocomplete="off" enterkeyhint="search" oninput="if(window.DGFoodSearch)DGFoodSearch.render(this.value)"></label>
    <div id="mealSearchBox" class="meal-search">${(window.DGFoodSearch?DGFoodSearch.emptyHTML():'')}</div>
+   </div>
+   ${mealBasketHTML(T, mealKind)}
    <div class="rowx" style="margin-bottom:14px"><label class="field"><span class="label">kcal <span class="muted">(선택)</span></span><input class="input" id="kcal" type="number" placeholder="예: 520" inputmode="numeric"></label>
    <label class="field"><span class="label">단백질 g <span class="muted">(선택)</span></span><input class="input" id="prot" type="number" placeholder="예: 40" inputmode="numeric"></label></div>
    <button type="button" class="btn-primary btn-lg" onclick="sub('meal')">식사 기록하기 <span class="stat-chip gold" style="min-height:26px;padding:0 8px;font-size:12px;box-shadow:none">+5 XP</span></button>

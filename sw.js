@@ -1,7 +1,22 @@
-const V='dg-0.4.11';
+const V='dg-0.4.12';
 const FILES=['./','index.html','app.js','auth.js','health.js','health-ranges.js','supplements.js','coach.js','delivery-foods.js','food-search.js','delivery.js','char.png','icon-192.png','icon-512.png','manifest.webmanifest','face.js','avatar.js','vendor/three.custom.min.js','assets/avatar/char-current-0.4.9.glb','assets/avatar/char-goal-0.4.9.glb','design-tokens.css','screens.css','vendor/fonts/PretendardVariable.woff2','vendor/fonts/Lexend-latin.woff2','vendor/pdfjs/pdf.min.mjs','vendor/pdfjs/pdf.worker.min.mjs'];
-self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(FILES)));self.skipWaiting();});
-self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==V).map(k=>caches.delete(k)))));self.clients.claim();});
+self.addEventListener('install',e=>{
+  e.waitUntil((async()=>{
+    const c=await caches.open(V);
+    FILES.forEach(f=>c.add(f).catch(()=>{}));
+    await self.skipWaiting();
+  })());
+});
+self.addEventListener('activate',e=>{e.waitUntil((async()=>{
+  const ks=await caches.keys();
+  const old=ks.filter(k=>k!==V&&/^dg-\d/.test(k));
+  await Promise.all(old.map(k=>caches.delete(k)));
+  await self.clients.claim();
+  if(old.some(k=>String(k).indexOf('dg-')===0)){
+    const cls=await self.clients.matchAll({type:'window',includeUncontrolled:true});
+    await Promise.all(cls.map(c=>c.navigate?c.navigate(c.url):null));
+  }
+})());});
 self.addEventListener('fetch',e=>{
   const u=new URL(e.request.url);
   if(e.request.method==='POST'&&/share-delivery\/?$/.test(u.pathname)){

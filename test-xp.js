@@ -29,5 +29,5 @@ ctx.ensureSeed();
 const C = ctx.compute('2026-11-11');
 assert.strictEqual(C.total, 65, 'XP should be 65, got '+C.total);
 assert.strictEqual(C.level, 1, 'Level should be 1, got '+C.level);
-assert.strictEqual(vm.runInContext('VERSION', ctx), '0.4.11');
+assert.strictEqual(vm.runInContext('VERSION', ctx), '0.4.12');
 console.log('XP tests ok', {total:C.total, level:C.level, version:ctx.VERSION});
