@@ -1,5 +1,5 @@
-// 다이어트 게임 0.3.0 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타)
-const VERSION='0.3.0', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.0 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인)
+const VERSION='0.4.0', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const SEED=[
@@ -10,12 +10,15 @@ const ACH=[
  ['시작의 용기','게임 시작',50,'🌱'],['첫 만점 주','주간 감량 0.5~1.2kg 첫 달성',40,'🏅'],
  ['식단 지킴이','1,600~2,000kcal·단백질 130g+ 7일 누적',40,'🥗'],['걷기 습관','걷기 40~60분 7일 누적',40,'👟'],
  ['근력 스타트','근력 주 2회 처음 채움',30,'💪'],['스트릭 7','체중 기록 7일 연속',30,'🔥'],
- ['한 달 최소 목표','2단계 달성 (XP는 단계 보상으로 지급)',100,'🎯'],['보스 토벌','정체기 보스 첫 클리어',50,'🐉']];
+ ['한 달 최소 목표','2단계 달성 (XP는 단계 보상으로 지급)',100,'🎯'],['보스 토벌','정체기 보스 첫 클리어',50,'🐉'],
+ ['첫 동기화','로컬과 계정을 처음 맞췄을 때',20,'☁️']];
 const DERIVED=new Set(['quest','weekly_weight','warning']);
 
 let logDate=null,raw=load(), settings=Object.assign({goal:95,month:109},JSON.parse(localStorage.getItem(SKEY)||'{}')), tab='home';
-function load(){const s=localStorage.getItem(KEY);if(!s){const r=SEED.map(withId);localStorage.setItem(KEY,JSON.stringify(r));return r;}return JSON.parse(s);}
-function save(){localStorage.setItem(KEY,JSON.stringify(raw));}
+function load(){const s=localStorage.getItem(KEY);return s?JSON.parse(s):[];}
+function ensureSeed(){if(!raw.length){raw=SEED.map(withId);localStorage.setItem(KEY,JSON.stringify(raw));}}
+function save(){localStorage.setItem(KEY,JSON.stringify(raw));if(window.DGAuth)DGAuth.schedulePush();}
+function saveSettings(){localStorage.setItem(SKEY,JSON.stringify(settings));if(window.DGAuth)DGAuth.schedulePush();}
 function withId(e){return Object.assign({id:Date.now().toString(36)+Math.random().toString(36).slice(2,7)},e);}
 function today(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul'}).format(new Date());}
 const dn=d=>Date.UTC(+d.slice(0,4),+d.slice(5,7)-1,+d.slice(8,10))/864e5;
@@ -219,8 +222,8 @@ function sub(t){const d=$('#dt').value||today();
  if(t==='exercise'){const m=+$('#min').value;if(m>0)add({date:d,type:'exercise',item:$('#exT').value,value:String(m),note:''});}
  if(t==='water'){const v=+$('#wat').value;if(v>0)add({date:d,type:'water',item:'물',value:String(v),note:''});}}
 function ach(C){return topBar(C)+`<div class="card"><h3>단계 목표</h3><div class="muted">주간 평균(3일 이상 기록)으로 판정해요. 기한은 2단계만. 95·86kg은 확정 대기.</div>${LADDER.map(([kg,xp,t],i)=>`<div class="ach ${C.stages[i]?'':'no'}"><div class="ic">${['👣','🎯','📉','💯','🏆','💚'][i]}</div><div style="flex:1"><b>${i+1}단계 ${t}</b><div class="muted">${kg}kg 이하${i===1?' · 2026-12-10까지':''}</div></div><div>${C.stages[i]?C.stages[i].slice(5)+'<br>':''}+${xp}</div></div>`).join('')}</div><div class="card"><h3>업적</h3>${ACH.map(a=>`<div class="ach ${C.got[a[0]]?'':'no'}"><div class="ic">${a[3]}</div><div style="flex:1"><b>${a[0]}</b><div class="muted">${a[1]}</div></div><div>${C.got[a[0]]?C.got[a[0]].slice(5)+'<br>':''}+${a[2]}</div></div>`).join('')}</div>`;}
-function me(C){return topBar(C)+makeMe(C)+`<div class="card"><h3>내 정보</h3>시작 ${START_W}kg (${START_DATE}) · 현재 ${C.weight.toFixed(1)}kg<br>이번 달 목표 ${settings.month}kg (~12/10) · 장기 목표 ${settings.goal}kg<br>레벨 ${C.level} · 누적 ${C.total} XP · 코인 ${C.coins} · 스트릭 ${C.streak}일
- <div class="row" style="margin-top:8px"><input id="goal" type="number" step="0.5" value="${settings.goal}"><button class="btn" onclick="settings.goal=+$('#goal').value;localStorage.setItem(SKEY,JSON.stringify(settings));render()">장기 목표 저장</button></div></div>
+function me(C){return topBar(C)+(window.DGAuth?DGAuth.accountCard():'')+makeMe(C)+`<div class="card"><h3>내 정보</h3>시작 ${START_W}kg (${START_DATE}) · 현재 ${C.weight.toFixed(1)}kg<br>이번 달 목표 ${settings.month}kg (~12/10) · 장기 목표 ${settings.goal}kg<br>레벨 ${C.level} · 누적 ${C.total} XP · 코인 ${C.coins} · 스트릭 ${C.streak}일
+ <div class="row" style="margin-top:8px"><input id="goal" type="number" step="0.5" value="${settings.goal}"><button class="btn" onclick="settings.goal=+$('#goal').value;saveSettings();render()">장기 목표 저장</button></div></div>
  <div class="card"><h3>기록 백업</h3><div class="muted">게임 마스터와 같은 log.csv·status.csv 형식이에요.</div>
  <button class="btn" onclick="exportCsv()">내보내기</button><label class="btn" style="display:inline-block">가져오기 (log.csv)<input type="file" accept=".csv,text/csv" style="display:none" onchange="importCsv(this.files[0])"></label></div>
  <div class="card muted">다이어트 게임 ${VERSION} · 기획서 v3 규칙</div>`;}
@@ -252,4 +255,4 @@ function delFace(){if(!confirm('얼굴 사진을 지울까요?'))return;localSto
 // render() 뒤에 아바타 칸에 3D 캔버스를 붙인다 (avatar.js 모듈이 늦게 로드되면 모듈 쪽에서 다시 부름)
 window.dgMountAvatar=function(){const el=typeof document!=='undefined'&&document.querySelector('#avatarSlot');if(!el||!window.DGAvatar)return;
  const g=el.dataset.ghost;DGAvatar.mount(el,{kg:+el.dataset.kg,ghostKg:g&&+g<=+el.dataset.kg-0.1?+g:null,idle:+el.dataset.idle});};
-render();
+// boot() is in index.html after auth.js loads

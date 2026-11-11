@@ -35,10 +35,26 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px 3px;b
 .muted{color:#888;font-size:13px}h3{margin:6px 0}
 .toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 16px;border-radius:20px;z-index:9;display:none}
 .ach{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #eee}.ach .ic{font-size:26px}.ach.no{opacity:.45}
+
+#gate{display:none;position:fixed;inset:0;z-index:20;background:linear-gradient(#f7fcf8,#eaf7f0);overflow:auto}
+#gate.on{display:block}
+body.gate main,body.gate nav{display:none}
+.gwrap{max-width:520px;margin:0 auto;padding:36px 22px 48px;text-align:center}
+.gchar{width:58%;max-width:240px;display:block;margin:8px auto 6px;filter:drop-shadow(0 8px 16px #5cc79a44)}
+.gwrap h1{margin:6px 0 4px;font-size:32px;letter-spacing:-.5px}
+.gsub{margin:0 0 16px;color:#666;font-size:15px}
+.gpills{display:flex;gap:8px;justify-content:center;margin:0 0 28px;flex-wrap:wrap}
+.gpills span{border:1.5px solid var(--coral);color:#c4554c;background:#fff;border-radius:22px;padding:6px 14px;font-size:13px;font-weight:700}
+.gbtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;background:#fff;color:#222;border:1px solid #e5e5e5;border-radius:28px;padding:14px 16px;font-weight:800;font-size:16px;box-shadow:0 2px 8px #0001;margin:0 0 10px;font-family:inherit}
+.gbtnout{background:transparent;border:2px solid #b7ddc8;box-shadow:none;color:#333;font-weight:700}
+.gnote{margin:18px 0 0;color:#888;font-size:13px;line-height:1.6}
 </style></head><body>
+<div id="gate"></div>
 <main id="view"></main>
 <nav id="nav"></nav><div class="toast" id="toast"></div>
 <script src="app.js"></script>
+<script src="auth.js"></script>
 <script type="module" src="avatar.js"></script>
-<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');</script>
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
+if(window.DGAuth)DGAuth.boot();else{if(typeof ensureSeed==='function')ensureSeed();render();}</script>
 </body></html>
