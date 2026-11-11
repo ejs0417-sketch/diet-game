@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.2 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 비타민 XP)
-const VERSION='0.4.2', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.3 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 비타민 XP)
+const VERSION='0.4.3', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const SEED=[
@@ -12,7 +12,8 @@ const ACH=[
  ['근력 스타트','근력 주 2회 처음 채움',30,'💪'],['스트릭 7','체중 기록 7일 연속',30,'🔥'],
  ['한 달 최소 목표','2단계 달성 (XP는 단계 보상으로 지급)',100,'🎯'],['보스 토벌','정체기 보스 첫 클리어',50,'🐉'],
  ['첫 동기화','로컬과 계정을 처음 맞췄을 때',20,'☁️'],
- ['첫 비타민','비타민을 처음 기록했을 때',10,'💊'],['비타민 7일 연속','비타민을 7일 연속 기록',30,'✨']];
+ ['첫 비타민','비타민을 처음 기록했을 때',10,'💊'],['비타민 7일 연속','비타민을 7일 연속 기록',30,'✨'],
+ ['검진 등록','건강검진 결과를 처음 저장했을 때',20,'🏥']];
 const DERIVED=new Set(['quest','weekly_weight','warning']);
 
 let logDate=null,raw=load(), settings=Object.assign({goal:95,month:109,vitamins:['종합비타민']},JSON.parse(localStorage.getItem(SKEY)||'{}')), tab='home', logKind='meal', mealKind='저녁';
@@ -54,7 +55,7 @@ function compute(T){
    if(i===1)award(d,'한 달 최소 목표','2단계와 같음',0);});};
  for(let n=Math.min(dn(first),dn(START_DATE));n<=dn(T);n++){
   const d=ds(n),es=evs.filter(e=>e.date===d),wk=week(d);
-  const info={weight:null,meals:{},kcal:0,prot:0,missingKcal:0,mealCount:0,walk:0,strength:0,strMin:0,rest:false,water:0,warn:false,bonus:0,closed:false,vit:{},vitXp:0};
+  const info={weight:null,meals:{},kcal:0,prot:0,missingKcal:0,mealCount:0,walk:0,strength:0,strMin:0,rest:false,water:0,warn:false,bonus:0,closed:false,vit:{},vitXp:0,hq:{},hqXp:0};
   days[d]=info;const mealRows=[],habit=[];let seenMeal={},cumWalk=0;
   for(const e of es){
    const r={date:d,type:e.type,item:e.item,value:e.value,xp:0,kcal:e.kcal||'',protein_g:e.protein_g||'',kcal_source:e.kcal_source||'',note:e.note||'',id:e.id};
@@ -67,6 +68,7 @@ function compute(T){
    else if(e.type==='rest'){info.rest=true;}
    else if(e.type==='water'){const before=info.water;info.water=+(info.water+(+e.value||0)).toFixed(2);if(before<2&&info.water>=2){r.xp=5;habit.push(r);}}
    else if(e.type==='vitamin'){if(e.item&&!info.vit[e.item]){info.vit[e.item]=1;const left=15-info.vitXp;r.xp=Math.max(0,Math.min(5,left));info.vitXp+=r.xp;}}
+   else if(e.type==='health_quest'){if(e.item&&!info.hq[e.item]){info.hq[e.item]=1;const unit=(typeof DGHealth!=='undefined'&&DGHealth.HQ_XP&&DGHealth.HQ_XP[e.item])||5;const left=30-info.hqXp;r.xp=Math.max(0,Math.min(unit,left));info.hqXp+=r.xp;}}
    else if(e.type==='achievement'){const a=ACH.find(x=>x[0]===e.item);if(a&&!got[a[0]]){got[a[0]]=d;r.xp=a[2];}else continue;}
    rows.push(r);
    if(e.type==='vitamin'&&info.vit[e.item]&&!got['첫 비타민'])award(d,'첫 비타민');
@@ -152,7 +154,7 @@ function importCsv(file){const fr=new FileReader();fr.onload=()=>{const t=parseC
 
 // ---------- UI ----------
 const $=s=>document.querySelector(s);
-function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2200);}
+function toast(m){const t=$('#toast');if(!t)return;t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2200);}
 function add(e){const before=compute().total;raw.push(withId(e));save();const C=compute(),g=C.total-before;
  toast(g>0?`+${g} XP 획득!`+(Math.floor(C.total/100)>Math.floor(before/100)?' 🎉 레벨업!':''):'기록했어요');render();}
 function del(id){if(!confirm('이 기록을 지울까요?'))return;raw=raw.filter(e=>e.id!==id);save();render();}
@@ -202,6 +204,7 @@ function home(C){const qs=questDefs(C),show=qs.filter(q=>!q.done).slice(0,3);whi
  ${show.map(q=>qCard(q)).join('')}
  <div class="card" style="margin-top:4px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">빠른 기록</h3><span class="stat-chip flame">🔥 스트릭 <span class="num">${C.streak}</span>일</span></div>
  <div class="quick">${quick()}</div>${vitButtons(today())}</div>
+ ${(window.DGHealth?DGHealth.summaryCard():'')}
  </div>`;}
 function quick(){return `<button type="button" onclick="askWeight()"><span class="e">⚖️</span>체중</button><button type="button" onclick="tab='log';logKind='meal';render();setTimeout(()=>{const el=$('#mealMenu');if(el)el.focus();},50)"><span class="e">🍱</span>식사</button><button type="button" onclick="addWalk()"><span class="e">👟</span>걷기</button><button type="button" onclick="add({date:today(),type:'water',item:'물',value:'0.5',note:''})"><span class="e">💧</span>물 0.5L</button>`;}
 function vitList(){if(!Array.isArray(settings.vitamins))return ['종합비타민'];return [...new Set(settings.vitamins.map(s=>String(s).trim()).filter(Boolean))];}
@@ -249,7 +252,8 @@ function quest(C){const qs=questDefs(C),w=week(C.today),sc=C.strW[w]||0;
  ${qCard({ic:'💪',t:'근력 주 2~3회',s:'1회 15분 이상',p:sc,max:2,lab:`${sc} / 2~3회`,xp:100,done:sc>=2},'gold')}
  ${qCard({ic:'📉',t:'주간 평균 0.5~1.2kg 감량',s:`주말 정산 · 체중 3일 이상 필요 (지금 ${wk.length}일)`,p:0,max:1,lab:`이전 평균 ${C.lastAvg.toFixed(1)}kg`,xp:100,done:false},'gold')}
  ${qCard({ic:'🔥',t:'체중 기록 7일 연속',s:'7일마다 보너스',p:C.streak%7,max:7,lab:`${C.streak} 일`,xp:50,done:false},'gold')}
- ${bossCard(C)}</div>`;}
+ ${bossCard(C)}
+ ${(window.DGHealth?DGHealth.questBlock():'')}</div>`;}
 function bossCard(C){const B=C.boss;if(!B){const last=C.bossHist[C.bossHist.length-1];
   return `<div class="card" style="border:1.5px dashed #CFC3FF;background:var(--boss-50);display:flex;gap:12px;align-items:center"><div style="font-size:30px">🐉</div><div><b style="color:#4B2DB8">정체기 보스</b><div class="muted" style="color:#5B47A8">주간 평균이 2주 연속 줄지 않으면 나타나요. (지금 정체 ${C.flatWeeks}주)${last?`<br>지난 보스전: ${last.ok?'클리어! +80 XP':'이번 라운드는 비겼어요'}`:''}</div></div></div>`;}
  const live=C.today>=B.start;const it=[[!B.miss,'체중 결근 없음'],[!B.low,'1,600kcal 미만 날 없음'],[B.walkDays>=5,`걷기 40~60분 또는 휴식 ${B.walkDays}/5일`],[B.str>=1,`근력 ${B.str}/1회`],[null,`종료 때 주간 평균 ${B.startAvg.toFixed(1)}kg 아래로`]];
@@ -366,7 +370,7 @@ function ach(C){const icons=['👣','🎯','📉','💯','🏆','💚'];
  <div class="ach-grid">${ACH.map(a=>{const on=!!C.got[a[0]];
   return `<div class="ach-badge${on?' on':''}"><div class="ico">${a[3]}</div><div class="nm">${a[0]}</div><div class="ds">${a[1]}</div><div class="xp">${on?C.got[a[0]].slice(5).replace('-','/')+' 달성 · +'+a[2]:'+'+a[2]+' XP'}</div></div>`;}).join('')}</div>
  </div>`;}
-function me(C){return topBar(C)+`<div class="page">`+(window.DGAuth?DGAuth.accountCard():'')+makeMe(C)+infoCard(C)+vitCard()+backupCard()+(window.DGAuth?DGAuth.accountActions():'')+`<div class="muted" style="text-align:center;padding:4px 0 8px">다이어트 게임 ${VERSION} · 기획서 v3 규칙</div></div>`;}
+function me(C){return topBar(C)+`<div class="page">`+(window.DGAuth?DGAuth.accountCard():'')+makeMe(C)+infoCard(C)+vitCard()+(window.DGHealth?DGHealth.summaryCard():'')+backupCard()+(window.DGAuth?DGAuth.accountActions():'')+`<div class="muted" style="text-align:center;padding:4px 0 8px">다이어트 게임 ${VERSION} · 기획서 v3 규칙</div></div>`;}
 function infoCard(C){return `<div class="card"><h3>내 정보</h3>
  <div class="grid2" style="margin-bottom:12px">
   <div class="stat-tile"><div class="t">시작 · ${START_DATE.slice(5).replace('-','/')}</div><div class="v">${START_W.toFixed(1)}<small> kg</small></div></div>

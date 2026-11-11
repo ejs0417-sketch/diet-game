@@ -1,9 +1,9 @@
-// 다이어트 게임 0.4.2 — Google 로그인·동기화 (Supabase Auth, 기획서 v3 6절)
+// 다이어트 게임 0.4.3 — Google 로그인·동기화 (Supabase Auth, 기획서 v3 6절)
 // SB_ANON은 공개용 anon 키입니다. service_role·관리 토큰·DB 비밀번호는 넣지 않습니다.
 const SB_URL='https://ifdgncmhpclthudlvowe.supabase.co';
 const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmZGduY21ocGNsdGh1ZGx2b3dlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzNDgzMTAsImV4cCI6MjEwOTkyNDMxMH0.XFJoRuKM0FOxmK2fbHb7kkdO_2dKp_RN-YIflWiJzvw';
 const SESSKEY='dg_session_v1', GATEKEY='dg_gate_v1', PKCEKEY='dg_pkce_v1', BACKKEY='dg_merge_backup_v1', SYNCKEY='dg_sync_on_v1';
-const FACE_NEVER=['dg_face_v1','face','faceData','photo','photoDataUrl','avatarFace'];
+const FACE_NEVER=['dg_face_v1','dg_health_v1','face','faceData','photo','photoDataUrl','avatarFace','health','checkup','checkups','sbp','dbp','fpg','hba1c','lab','labs'];
 
 const DGAuth=(function(){
   let session=null, syncOn=false, syncText='동기화 안 함', pushTimer=0, busy=false;
@@ -53,8 +53,9 @@ const DGAuth=(function(){
   function sanitizeEvents(evs){
     return (evs||[]).map(e=>{
       const o={}; for(const k in e){if(!FACE_NEVER.includes(k))o[k]=e[k];}
+      if(o.type==='health_quest'){o.value='1';o.note='';}
       return o;
-    });
+    }).filter(e=>e.type!=='health'&&e.type!=='checkup');
   }
   function profileOf(){
     const u=session&&session.user;

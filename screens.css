@@ -41,6 +41,8 @@ main#view{padding:0 0 calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom))
 .list-row .m b{display:block;font-size:14px;color:var(--ink-900)}
 .list-row .m span{display:block;font-size:12px;color:var(--ink-500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .list-row .x{font-family:var(--font-num);font-weight:800;font-size:13px;color:var(--mint-700);white-space:nowrap}
+.list-row .x.worse{color:var(--coral-700)}
+.list-row .x.same{color:var(--ink-500)}
 .icon-btn{width:48px;height:48px;border:0;border-radius:12px;background:transparent;display:grid;place-items:center;font-size:18px;flex:none}
 .log-head{background:var(--grad-hud);border-radius:0 0 28px 28px;padding:16px 16px 16px;margin-bottom:16px;color:#fff}
 .log-head h1{color:#fff;font-size:24px;line-height:32px}
@@ -88,3 +90,14 @@ body.gate main,body.gate nav{display:none}
   .hero .avatar-frame{min-height:240px}
   .wcard .big{font-size:36px;line-height:40px}
 }
+
+/* 건강검진 */
+.health-pane{position:fixed;inset:0;z-index:25;background:rgba(20,26,51,.45);overflow:auto;padding:12px 0 24px}
+.health-sheet{max-width:520px;margin:0 auto;padding:12px 16px 40px;background:var(--bg);min-height:100%;border-radius:20px 20px 0 0}
+.hchip{display:inline-flex;align-items:center;min-height:28px;padding:0 10px;border-radius:999px;font-size:12px;font-weight:800}
+.hchip.ok{background:var(--mint-50);color:var(--mint-700)}
+.hchip.warn{background:var(--warn-50);color:var(--warn-700)}
+.hchip.risk{background:var(--coral-50);color:var(--coral-700)}
+
+.health-pane input[type=date]::-webkit-calendar-picker-indicator{opacity:0;position:absolute;inset:0;width:100%;height:100%;cursor:pointer}
+.health-pane input[type=date]{position:relative}
