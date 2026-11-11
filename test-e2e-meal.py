@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""0.4.12 E2E: consecutive meal-menu search on every entry path, short viewport, SW update."""
+"""0.4.13 E2E: version badge, 집밥 chips, fruit search, consecutive search, short viewport, SW update."""
 from __future__ import annotations
 import http.server, json, os, socket, sys, threading, time
 from functools import partial
@@ -7,8 +7,10 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent
-SHOT_DIR = Path('/tmp/e2e-0.4.12')
-FINAL_SHOT = Path('/workspace/다이어트게임-0.4.12-연속입력.png')
+SHOT_DIR = Path('/tmp/e2e-0.4.13')
+FINAL_SHOT = Path('/workspace/다이어트게임-0.4.13-집밥선택.png')
+HOME_SHOT = Path('/workspace/다이어트게임-0.4.13-버전표시.png')
+FRUIT_SHOT = Path('/workspace/다이어트게임-0.4.13-과일검색.png')
 OLD_DIR = Path('/tmp/dg-0.4.10')
 UA = ('Mozilla/5.0 (Linux; Android 16; SM-F766N) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36')
@@ -183,14 +185,44 @@ def main():
             browser,ctx,page=launch(p,412,915)
             guest(page,url)
             ver=page.evaluate('()=>typeof VERSION!=="undefined"?VERSION:null')
-            if ver!='0.4.12':
-                FAILS.append(f'로컬 버전이 0.4.12가 아님: {ver}')
+            if ver!='0.4.13':
+                FAILS.append(f'로컬 버전이 0.4.13가 아님: {ver}')
+            badge=page.locator('.ver-badge')
+            if badge.count()==0 or 'v0.4.13' not in badge.first.inner_text():
+                FAILS.append(f'홈 버전 배지 없음: {badge.count()}')
+            page.wait_for_timeout(400)
+            page.screenshot(path=str(HOME_SHOT))
+            log('HOME_SHOT', HOME_SHOT)
             page.locator('nav#nav button', has_text='기록').click()
             page.wait_for_selector('#mealMenu', timeout=8000)
             page.wait_for_timeout(200)
             assert_search_visible(page, 'fresh-nav enter', 'fresh-nav-enter')
-            ok=add_three(page, 'fresh-nav', '저녁')
+            if page.locator('.log-head .ver-badge', has_text='v0.4.13').count()==0:
+                FAILS.append('기록 헤더 버전 배지 없음')
+            # 과일 검색 스크린샷
+            inp=page.locator('#mealMenu')
+            inp.fill('')
+            inp.fill('홍시')
+            page.wait_for_selector('.meal-search-item', timeout=6000)
+            txt=page.locator('.meal-search-item').first.inner_text()
+            if '홍시' not in txt or '55' not in txt:
+                FAILS.append(f'홍시 검색 결과 이상: {txt}')
+            page.wait_for_timeout(300)
+            page.screenshot(path=str(FRUIT_SHOT))
+            log('FRUIT_SHOT', FRUIT_SHOT)
+            inp.fill('')
+            page.wait_for_timeout(150)
+            # 집밥 선택 후 3개 연속 추가
+            page.locator('[data-seg="place"] button', has_text='집밥').click()
+            page.wait_for_timeout(120)
+            sel=page.locator('[data-seg="place"] button', has_text='집밥').get_attribute('aria-selected')
+            if sel!='true':
+                FAILS.append(f'집밥 선택이 안 됨 aria-selected={sel}')
+            ok=add_three(page, 'home-style', '저녁')
             if ok:
+                basket=search_state(page).get('basket') or ''
+                if '집밥' not in basket:
+                    FAILS.append(f'집밥 태그가 바구니에 없음: {basket}')
                 page.wait_for_timeout(2800)
                 page.screenshot(path=str(FINAL_SHOT))
                 log('FINAL_SHOT', FINAL_SHOT)
@@ -206,6 +238,8 @@ def main():
             page.evaluate('()=>{if(typeof revealMealSearch==="function")revealMealSearch();}')
             page.wait_for_timeout(150)
             assert_search_visible(page, 'fresh-short enter', 'fresh-short-enter')
+            page.locator('[data-seg="place"] button', has_text='집밥').click()
+            page.wait_for_timeout(80)
             add_three(page, 'fresh-short', '점심')
             browser.close()
 
@@ -260,9 +294,9 @@ def main():
             add_three(page, 'slot-점저', '점저')
             browser.close()
 
-            # 7) SW 0.4.10 캐시: 첫 기록은 홈으로 나감(옛 버그). 서버를 0.4.12로 바꾼 뒤
+            # 7) SW 0.4.10 캐시: 첫 기록은 홈으로 나감(옛 버그). 서버를 0.4.13로 바꾼 뒤
             #    update()를 시도하고, 0.4.10 페이지에는 자동새로고침이 없으므로
-            #    한 번 새로고침(앱을 다시 연 것과 같음, network-first) 후 0.4.12 연속 추가를 확인.
+            #    한 번 새로고침(앱을 다시 연 것과 같음, network-first) 후 0.4.13 연속 추가를 확인.
             httpd.legacy = True
             browser,ctx,page=launch(p,412,915)
             guest(page, url)
@@ -285,7 +319,7 @@ def main():
             except Exception as e:
                 log('update() call', type(e).__name__, e)
             try:
-                page.wait_for_function('() => typeof VERSION!=="undefined" && VERSION==="0.4.12"', timeout=4000)
+                page.wait_for_function('() => typeof VERSION!=="undefined" && VERSION==="0.4.13"', timeout=4000)
             except Exception:
                 page.reload(wait_until='domcontentloaded', timeout=20000)
             page.wait_for_timeout(500)
@@ -295,8 +329,8 @@ def main():
             ver2=page.evaluate('()=>typeof VERSION!=="undefined"?VERSION:null')
             log('SW after update/reload VERSION', ver2)
             page.screenshot(path=str(SHOT_DIR/'sw-updated-home.png'))
-            if ver2!='0.4.12':
-                FAILS.append(f'SW 업데이트 후 버전이 0.4.12가 아님: {ver2}')
+            if ver2!='0.4.13':
+                FAILS.append(f'SW 업데이트 후 버전이 0.4.13가 아님: {ver2}')
             else:
                 deadline=time.time()+12
                 while time.time()<deadline:
@@ -312,11 +346,11 @@ def main():
                 page.locator('nav#nav button', has_text='기록').click()
                 page.wait_for_selector('#mealMenu', timeout=8000)
                 st=assert_search_visible(page, 'sw-updated enter', 'sw-updated-enter')
-                if st.get('version')!='0.4.12' or not st.get('inView'):
+                if st.get('version')!='0.4.13' or not st.get('inView'):
                     FAILS.append(f'sw-updated 기록 화면 검색창 확인 실패 {st}')
             browser.close()
 
-            # 8) 0.4.12 전용 세션에서 sw.js 내용이 바뀌면 자동 새로고침
+            # 8) 0.4.13 전용 세션에서 sw.js 내용이 바뀌면 자동 새로고침
             httpd.legacy = False
             httpd.sw_bump = False
             browser,ctx,page=launch(p,412,915)
@@ -332,13 +366,13 @@ def main():
                     page.wait_for_selector('nav#nav', timeout=20000)
                 ver3=page.evaluate('()=>typeof VERSION!=="undefined"?VERSION:null')
                 log('SW bump auto-reload VERSION', ver3)
-                if ver3!='0.4.12':
-                    FAILS.append(f'0.4.12 자동새로고침 후 버전 이상: {ver3}')
+                if ver3!='0.4.13':
+                    FAILS.append(f'0.4.13 자동새로고침 후 버전 이상: {ver3}')
                 else:
                     log('SW bump auto-reload OK')
             except Exception as e:
                 log('SW bump auto-nav', type(e).__name__, e)
-                log('WARN: 0.4.12 자동새로고침이 이 환경에서 확인되지 않음 (코드는 index.html controllerchange + sw navigate 유지)')
+                log('WARN: 0.4.13 자동새로고침이 이 환경에서 확인되지 않음 (코드는 index.html controllerchange + sw navigate 유지)')
             browser.close()
 
     finally:
@@ -349,10 +383,11 @@ def main():
         for f in FAILS:
             log(' -', f)
         sys.exit(1)
-    if not FINAL_SHOT.exists():
-        log('E2E FAIL: 최종 스크린샷 없음')
+    missing=[p for p in (FINAL_SHOT, HOME_SHOT, FRUIT_SHOT) if not p.exists()]
+    if missing:
+        log('E2E FAIL: 스크린샷 없음', *[str(p) for p in missing])
         sys.exit(1)
-    log('E2E OK', FINAL_SHOT)
+    log('E2E OK', FINAL_SHOT, HOME_SHOT, FRUIT_SHOT)
     sys.exit(0)
 
 if __name__=='__main__':

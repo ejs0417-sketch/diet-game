@@ -75,3 +75,15 @@ assert.ok(!/햄치즈/.test(html));
 assert.ok(/removeSlotMeal\(/.test(html));
 
 console.log('meal basket tests ok', {lunch:ctx.mealsForSlot('2026-11-11','점심').length, dinner:afterDel.length, xp:ctx.compute('2026-11-11').total});
+
+// 0.4.13 식사 방식: 필드 없어도 기존 데이터·XP 유지, 집밥 태그는 XP에 영향 없음
+ctx._tmp={date:'2026-11-11',type:'meal',item:'점심',value:'사과',kcal:'52',place:'home'};
+vm.runInContext('raw.push(withId(_tmp))', ctx);
+assert.strictEqual(ctx.compute('2026-11-11').total, 70, 'place가 있어도 같은 끼니 XP는 그대로');
+assert.strictEqual(ctx.compute('2026-11-11').level, 1);
+assert.ok(ctx.placeTag({place:'home'}).indexOf('집밥')>=0);
+assert.strictEqual(ctx.placeTag({}), '');
+const bh=ctx.mealBasketHTML('2026-11-11','점심');
+assert.ok(/사과/.test(bh)&&/집밥/.test(bh), bh);
+assert.ok(ctx.mealsForSlot('2026-11-11','점심').some(e=>!e.place), 'place 없는 기존 기록 호환');
+console.log('meal place tests ok');

@@ -39,7 +39,7 @@ has('냉면', h=>h.item.id==='mul-naengmyeon'||h.item.id==='bibim-naengmyeon', '
 const jj=search.searchFoods('짜장면',{foods:foods.FOODS,limit:5})[0];
 assert.ok(jj && jj.item.kcal>=700 && jj.item.unit==='1인분', '짜장면 kcal 1인분');
 
-assert.strictEqual(foods.count, 208, '음식 208개 (기존 184 + 봉구스 19 + 빼빼로 5)');
+assert.strictEqual(foods.count, 230, '음식 230개 (기존 208 + 과일 22)');
 
 // 짧은 한글 검색이 초성 오탐으로 엉뚱한 메뉴를 넣지 않아요
 const kimchi=names('김치');
@@ -103,3 +103,31 @@ console.log('0.4.9 food-search extra tests ok');
 }
 
 console.log('0.4.10 brand-search tests ok', {봉구스:names('봉구스').slice(0,5), 빼빼로:names('빼빼로'), ㅂㄱㅅ:names('ㅂㄱㅅ').slice(0,3), ㅃㅃㄹ:names('ㅃㅃㄹ').slice(0,3), 페페로:names('페페로').slice(0,3)});
+
+// 0.4.13 과일 검색
+{
+  has('홍시', h=>h.item.id==='fruit-hongsi'&&h.item.kcal===55, '홍시 55kcal');
+  has('연시', h=>h.item.id==='fruit-hongsi', '별칭 연시=홍시');
+  has('단감', h=>h.item.id==='fruit-dangam'&&h.item.kcal===46, '단감');
+  has('곶감', h=>h.item.id==='fruit-gotgam'&&h.item.kcal===219, '곶감 100g 219');
+  has('사과', h=>h.item.id==='fruit-apple'&&h.item.kcal===52, '사과');
+  has('귤', h=>h.item.id==='fruit-mandarin'&&h.item.kcal===47, '귤=감귤');
+  has('밀감', h=>h.item.id==='fruit-mandarin', '밀감=감귤');
+  has('감귤', h=>h.item.id==='fruit-mandarin', '감귤');
+  has('바나나', h=>h.item.id==='fruit-banana'&&h.item.kcal===62, '바나나');
+  has('샤인머스캣', h=>h.item.id==='fruit-shine'&&h.item.kcal===53, '샤인머스캣');
+  has('샤인머스켓', h=>h.item.id==='fruit-shine', '오타 샤인머스켓');
+  has('ㅎㅅ', h=>h.item.id==='fruit-hongsi', '초성 ㅎㅅ → 홍시');
+  has('ㄱㄱ', h=>h.item.id==='fruit-gotgam'||h.item.id==='fruit-mandarin', '초성 ㄱㄱ');
+  has('토마토', h=>h.item.id==='fruit-tomato', '토마토');
+  const tomato=names('토마토');
+  assert.ok(tomato.includes('토마토'), '토마토 결과');
+  has('체리', h=>h.item.id==='fruit-cherry'&&h.item.kcal===46, '체리');
+  const cherry=search.searchFoods('체리',{foods:foods.FOODS,limit:8});
+  assert.strictEqual(cherry[0].item.id,'fruit-cherry','체리 1순위');
+  const hong=search.searchFoods('홍시',{foods:foods.FOODS,limit:5})[0];
+  assert.ok(hong&&hong.item.unit==='1회(80g)'&&hong.item.grams===80&&hong.item.kcal100===69, '홍시 환산 기준');
+  assert.strictEqual(foods.nutritionForPlace({kcal:10,home:{kcal:8}},'home').kcal, 8);
+  assert.strictEqual(foods.nutritionForPlace({kcal:10},'home').kcal, 10, '집밥 전용값 없으면 동일');
+  console.log('0.4.13 fruit-search tests ok', {홍시:names('홍시').slice(0,3), 귤:names('귤').slice(0,3), 샤인:names('샤인').slice(0,3)});
+}

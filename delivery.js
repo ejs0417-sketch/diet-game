@@ -343,7 +343,9 @@ function rowsFromParsed(parsed){
   });
 }
 function refreshRowMacros(r,people){
-  const dish=r.dishId?foods().find(f=>f.id===r.dishId):null;
+  const dish0=r.dishId?foods().find(f=>f.id===r.dishId):null;
+  const fn=(typeof nutritionForPlace==='function'?nutritionForPlace:(root.DGFoods&&DGFoods.nutritionForPlace));
+  const dish=fn&&dish0?fn(dish0,typeof mealPlace!=='undefined'?mealPlace:''):dish0;
   const base=dish?applyPortion(dish,r.qty||1,1,r.options):(r.base||{kcal:+r.kcal||0,protein:+r.protein||0,carbs:+r.carbs||0,fat:+r.fat||0,sodium:+r.sodium||0});
   r.base=base;
   const se=shareAndEaten(base,{people:people||1,qty:r.qty,portion:r.portion,shareMode:r.shareMode,sharePeople:r.peopleOverride,eatenFrac:eatenFracOf(r)});
@@ -651,7 +653,7 @@ function commitMeals(){
     const name=String(r.name).trim();
     rememberFav(Object.assign({store},r,{name}),date);
     rememberLeftover(Object.assign({store},r),date,people);
-    return {
+    const ev={
       date,type:'meal',item:slot,value:r.match||name,
       kcal:r.kcal===''||r.kcal==null?'':String(r.kcal),
       protein_g:r.protein===''||r.protein==null?'':String(r.protein),
@@ -661,8 +663,10 @@ function commitMeals(){
       kcal_source:r.dishId?((draft&&draft.source==='search')?'음식표(대략)':'배달메뉴표(대략)'):(r.kcal?'직접입력':''),
       store,portion:r.portion,qty:r.qty,dish_id:r.dishId||'',people,
       eaten:eatenFracOf(r),
-      note:[(r.options||[]).join(', '),store?('가게='+store):'',people>1?('나눔='+people+'명'):'',eatenFracOf(r)<1?('먹은양='+Math.round(eatenFracOf(r)*100)+'%'):''].filter(Boolean).join('; ')
+      note:[(r.options||[]).join(', '),store?('가게='+store):'',people>1?('나눔='+people+'명'):'',eatenFracOf(r)<1?('먹은양='+Math.round(eatenFracOf(r)*100)+'%'):'',(typeof mealPlace!=='undefined'&&mealPlace)?('방식='+((typeof placeMeta==='function'&&placeMeta(mealPlace)||[])[2]||mealPlace)):''].filter(Boolean).join('; ')
     };
+    if(typeof mealPlace!=='undefined'&&mealPlace)ev.place=mealPlace;
+    return ev;
   });
   root._dgLastMealLog=evs[evs.length-1];
   if(typeof withId==='function'&&typeof raw!=='undefined'){

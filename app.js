@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.12 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색)
-const VERSION='0.4.12', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.13 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색)
+const VERSION='0.4.13', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
@@ -17,7 +17,7 @@ const ACH=[
  ['검진 등록','건강검진 결과를 처음 저장했을 때',20,'🏥']];
 const DERIVED=new Set(['quest','weekly_weight','warning']);
 
-let logDate=null,raw=load(), settings=Object.assign({goal:95,month:109,vitamins:['종합비타민'],favMenus:[],leftovers:[]},JSON.parse(localStorage.getItem(SKEY)||'{}')), tab='home', logKind='meal', mealKind='저녁';
+let logDate=null,raw=load(), settings=Object.assign({goal:95,month:109,vitamins:['종합비타민'],favMenus:[],leftovers:[],mealPlace:''},JSON.parse(localStorage.getItem(SKEY)||'{}')), tab='home', logKind='meal', mealKind='저녁', mealPlace=settings.mealPlace||'';
 function load(){const s=localStorage.getItem(KEY);return s?JSON.parse(s):[];}
 function ensureSeed(){if(!raw.length){raw=SEED.map(withId);localStorage.setItem(KEY,JSON.stringify(raw));}}
 function save(){localStorage.setItem(KEY,JSON.stringify(raw));if(window.DGAuth)DGAuth.schedulePush();}
@@ -62,7 +62,7 @@ function mealBasketHTML(date,slot){
   return `<div id="mealBasket" class="meal-basket">
     <div class="meal-basket-head">이 끼니에 담은 메뉴 <b>${rows.length}개 · ${Math.round(tot.kcal).toLocaleString('ko-KR')}kcal</b></div>
     ${rows.map(e=>`<div class="meal-basket-item">
-      <span class="nm"><b>${esc(e.value||'메뉴')}</b><span>${kc(e)!=null?`${Math.round(kc(e)).toLocaleString('ko-KR')}kcal`:''}${pr(e)!=null?` · 단백질 ${Math.round(pr(e))}g`:''}</span></span>
+      <span class="nm"><b>${esc(e.value||'메뉴')}</b><span>${[kc(e)!=null?`${Math.round(kc(e)).toLocaleString('ko-KR')}kcal`:'',placeTag(e),pr(e)!=null?`단백질 ${Math.round(pr(e))}g`:''].filter(Boolean).join(' · ')}</span></span>
       <button type="button" class="icon-btn" aria-label="삭제" onclick="removeSlotMeal('${escJs(e.id)}')">🗑️</button>
     </div>`).join('')}
   </div>`;
@@ -202,7 +202,7 @@ function compute(T){
 }
 
 // ---------- CSV ----------
-const LOGH=['date','type','item','value','xp','kcal','protein_g','kcal_source','note'];
+const LOGH=['date','type','item','value','xp','kcal','protein_g','kcal_source','note','place'];
 function csvCell(v){v=v==null?'':String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;}
 function toCsv(head,rows){return head.join(',')+'\n'+rows.map(r=>head.map(h=>csvCell(r[h])).join(',')).join('\n')+'\n';}
 function parseCsv(t){const out=[];let row=[],c='',q=false;t=t.replace(/^\uFEFF/,'');
@@ -215,7 +215,7 @@ function exportCsv(){const C=compute();download(`log_${C.today}.csv`,toCsv(LOGH,
 function importCsv(file){const fr=new FileReader();fr.onload=()=>{const t=parseCsv(fr.result);const h=t.shift()||[];
  const ix=k=>h.indexOf(k);if(ix('date')<0||ix('type')<0||ix('item')<0||ix('value')<0){alert('log.csv 형식이 아니에요. status.csv는 자동으로 다시 계산돼서 가져올 필요가 없어요.');return;}
  const g=(r,k)=>ix(k)>=0?(r[ix(k)]||''):'';
- const ev=t.map(r=>({date:g(r,'date'),type:g(r,'type'),item:g(r,'item'),value:g(r,'value'),kcal:g(r,'kcal'),protein_g:g(r,'protein_g'),kcal_source:g(r,'kcal_source'),note:g(r,'note')})).filter(e=>!DERIVED.has(e.type)&&e.item!=='식단보너스'&&e.item!=='걷기가산');
+ const ev=t.map(r=>({date:g(r,'date'),type:g(r,'type'),item:g(r,'item'),value:g(r,'value'),kcal:g(r,'kcal'),protein_g:g(r,'protein_g'),kcal_source:g(r,'kcal_source'),note:g(r,'note'),place:g(r,'place')||''})).filter(e=>!DERIVED.has(e.type)&&e.item!=='식단보너스'&&e.item!=='걷기가산');
  if(!confirm(`기록 ${ev.length}건을 가져와서 지금 기록을 바꿀까요? (XP는 기획서 v1 규칙으로 다시 계산돼요)`))return;
  raw=ev.map(withId);save();toast('가져오기 완료');render();};fr.readAsText(file,'utf-8');}
 
@@ -240,7 +240,7 @@ function topBar(C){const p=C.total%100;
   <div class="hud-mid"><div class="hud-line"><b>Lv.${C.level}</b><span>다음 레벨까지 <b class="num" style="font-size:13px;color:#fff">${100-p}</b> XP</span></div>
   <div class="xp-bar"><i style="width:${p}%"></i></div>
   <div class="xp-meta"><span><span class="num">${p}</span> / 100 XP</span><span>누적 <span class="num">${C.total}</span> XP</span></div></div>
-  <div class="hud-right"><span class="stat-chip glass">🪙 <span class="num">${C.coins}</span></span><span class="stat-chip glass">🔥 <span class="num">${C.streak}</span>일</span></div>
+  <div class="hud-right">${versionBadge()}<span class="stat-chip glass">🪙 <span class="num">${C.coins}</span></span><span class="stat-chip glass">🔥 <span class="num">${C.streak}</span>일</span></div>
  </div></header>`;}
 function questDefs(C){const t=C.days[C.today];const meals=MEALS.filter(m=>t.meals[m]).length;return [
  {ic:'⚖️',t:'아침 공복 체중',s:'하루 한 번, 일어나서 바로',p:t.weight!==null?1:0,max:1,lab:t.weight!==null?t.weight+'kg':'0 / 1',xp:10,done:t.weight!==null},
@@ -336,6 +336,18 @@ function shiftLogDate(delta){const t=logDate||today(),n=ds(dn(t)+delta);if(n>tod
 function setLogKind(k){logKind=k;
  document.querySelectorAll('[data-logkind]').forEach(el=>{el.hidden=el.dataset.logkind!==k;});
  document.querySelectorAll('[data-seg="kind"] button').forEach(b=>{b.setAttribute('aria-selected',b.dataset.k===k?'true':'false');});}
+
+const MEAL_PLACES=[['home','🏠','집밥'],['out','🍽️','외식'],['delivery','📦','배달·포장']];
+function placeMeta(code){return MEAL_PLACES.find(p=>p[0]===code)||null;}
+function placeTag(e){const m=placeMeta(e&&e.place);return m?m[1]+m[2]:'';}
+function setMealPlace(k){
+  mealPlace=(k&&k===mealPlace)?'':(k||'');
+  settings.mealPlace=mealPlace;saveSettings();
+  document.querySelectorAll('[data-seg="place"] button').forEach(b=>b.setAttribute('aria-selected',b.dataset.k===mealPlace?'true':'false'));
+  const inp=$('#mealMenu');
+  if(window.DGFoodSearch)DGFoodSearch.render(inp?inp.value:'');
+}
+function versionBadge(){return `<span class="ver-badge" title="앱 버전">v${VERSION}</span>`;}
 function setMealKind(k){mealKind=k;
  document.querySelectorAll('[data-seg="meal"] button').forEach(b=>{b.setAttribute('aria-selected',b.dataset.k===k?'true':'false');});
  const date=($('#dt')&&$('#dt').value)||logDate||today();
@@ -385,7 +397,8 @@ function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0
    <button type="button" class="btn-primary btn-lg" onclick="sub('weight')">체중 기록 <span class="stat-chip gold" style="min-height:26px;padding:0 8px;font-size:12px;box-shadow:none">+10 XP</span></button>`,
   meal:`<div id="mealSearchDock" class="meal-search-dock${mealsForSlot(T, mealKind).length?' compact':''}">
    <div class="label" style="font-size:13px;font-weight:700;margin-bottom:6px">끼니</div>
-   <div class="segmented meal-slots" data-seg="meal" style="margin-bottom:12px;background:#F3F5FB" role="tablist">${meals.map(m=>`<button type="button" data-k="${m}" aria-selected="${mealKind===m}" onclick="setMealKind('${m}')">${m}</button>`).join('')}</div>
+   <div class="segmented meal-slots" data-seg="meal" style="margin-bottom:8px;background:#F3F5FB" role="tablist">${meals.map(m=>`<button type="button" data-k="${m}" aria-selected="${mealKind===m}" onclick="setMealKind('${m}')">${m}</button>`).join('')}</div>
+   <div class="segmented meal-place" data-seg="place" style="margin-bottom:8px;background:#F3F5FB" role="tablist" aria-label="식사 방식">${MEAL_PLACES.map(([k,i,l])=>`<button type="button" data-k="${k}" aria-selected="${mealPlace===k}" onclick="setMealPlace('${k}')">${i} ${l}</button>`).join('')}</div>
    <label class="field" style="margin-bottom:8px"><span class="label">메뉴 검색</span><input class="input" id="mealMenu" placeholder="짜장면, 치킨, 초성 ㄱㅊㅉㄱ" autocomplete="off" enterkeyhint="search" oninput="if(window.DGFoodSearch)DGFoodSearch.render(this.value)"></label>
    <div id="mealSearchBox" class="meal-search">${(window.DGFoodSearch?DGFoodSearch.emptyHTML():'')}</div>
    </div>
@@ -401,7 +414,7 @@ function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0
   water:`<label class="field" style="margin-bottom:14px"><span class="label">물 (L)</span><input class="input" id="wat" type="number" step="0.1" placeholder="예: 0.5" inputmode="decimal"></label>
    <button type="button" class="btn-primary btn-lg" onclick="sub('water')">물 기록하기</button>`
  };
- return `<header class="log-head"><div style="display:flex;align-items:center;justify-content:space-between"><h1>기록</h1><span class="stat-chip glass">🪙 <span class="num">${C.coins}</span> · Lv.${C.level}</span></div>
+ return `<header class="log-head"><div style="display:flex;align-items:center;justify-content:space-between"><h1>기록 ${versionBadge()}</h1><span class="stat-chip glass">🪙 <span class="num">${C.coins}</span> · Lv.${C.level}</span></div>
   <div class="log-date"><button type="button" class="log-nav" onclick="shiftLogDate(-1)" aria-label="이전 날">‹</button>
   <div class="when">📅 ${T} (${weekday(T)})${isToday?' · 오늘':''}<input type="date" id="dt" value="${T}" max="${C.today}" aria-label="날짜 선택" onchange="logDate=this.value;render()"></div>
   <button type="button" class="log-nav" onclick="shiftLogDate(1)" ${canNext?'':'disabled'} aria-label="다음 날">›</button></div></header>
@@ -428,12 +441,12 @@ function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0
  <div class="card"><h3>체중 기록</h3>${chart(C)}
   ${wts.slice().reverse().map(s=>`<div class="list-row"><span class="d">${s.date.slice(5).replace('-','/')}</span><div class="m"><b class="num">${s.weight}kg</b><span>감량 ${s.lost_kg}kg</span></div></div>`).join('')}
   ${Object.entries(C.weekly).map(([w,W])=>`<div class="muted">${+w+1}주차 ${W.avg?'평균 '+W.avg.toFixed(2)+'kg, 감량 '+W.loss+'kg, +'+W.xp+' XP':'기록 '+W.n+'일 (3일 미만)'}</div>`).join('')}</div>
- <div class="card"><h3>최근 기록</h3>${recent.map(e=>`<div class="list-row"><span class="d">${e.date.slice(5).replace('-','/')}</span><div class="m"><b>${esc(e.item)}</b><span>${esc((e.value||'')+((e.kcal||e.protein_g)?` · ${e.kcal||''}${e.protein_g?' / '+e.protein_g+'g':''}`:''))}</span></div><span class="x">${byDate[e.id]?('+'+byDate[e.id]+' XP'):'0 XP'}</span><button type="button" class="icon-btn" aria-label="삭제" onclick="del('${e.id}')">🗑️</button></div>`).join('')}</div>
+ <div class="card"><h3>최근 기록</h3>${recent.map(e=>`<div class="list-row"><span class="d">${e.date.slice(5).replace('-','/')}</span><div class="m"><b>${esc(e.item)}${placeTag(e)?' · '+placeTag(e):''}</b><span>${esc((e.value||'')+((e.kcal||e.protein_g)?` · ${e.kcal||''}${e.protein_g?' / '+e.protein_g+'g':''}`:''))}</span></div><span class="x">${byDate[e.id]?('+'+byDate[e.id]+' XP'):'0 XP'}</span><button type="button" class="icon-btn" aria-label="삭제" onclick="del('${e.id}')">🗑️</button></div>`).join('')}</div>
  </div>`;}
 function sub(t){const d=($('#dt')&&$('#dt').value)||today();
  if(t==='weight'){const v=+$('#w').value;if(v>30)addWeight(d,v);else toast('체중을 확인해 주세요');}
  if(t==='meal'){const m=$('#mealMenu').value.trim();if(!m)return toast('메뉴를 적어 주세요');const k=$('#kcal').value,p=$('#prot').value;
-  add({date:d,type:'meal',item:mealKind||'저녁',value:m,kcal:k,protein_g:p,kcal_source:k?'직접입력':'',note:''});}
+  const ev={date:d,type:'meal',item:mealKind||'저녁',value:m,kcal:k,protein_g:p,kcal_source:k?'직접입력':'',note:mealPlace?('방식='+((placeMeta(mealPlace)||[])[2]||mealPlace)):''};if(mealPlace)ev.place=mealPlace;add(ev);}
  if(t==='exercise'){const m=+$('#min').value;const kind=(($('[data-seg="ex"]')||{}).dataset||{}).v||'걷기';
   if(m>0)add({date:d,type:'exercise',item:kind,value:String(m),note:''});else toast('시간을 적어 주세요');}
  if(t==='water'){const v=+$('#wat').value;if(v>0)add({date:d,type:'water',item:'물',value:String(v),note:''});else toast('물의 양을 적어 주세요');}}

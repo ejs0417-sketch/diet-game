@@ -210,8 +210,37 @@ const FOODS=[
 {"id":"pepero-nude","name":"빼빼로 누드","aliases":["누드빼빼로","빼빼로누드","누드초코빼빼로","초코필드빼빼로"],"searchAliases":["누드빼빼로","빼빼로누드","누드초코","초코필드"],"brand":"롯데웰푸드","cat":"과자","unit":"1갑","kcal":235,"grams":43,"rank":3,"src":"식약처 공공데이터 품목제조보고(번호 1983030801093) 총내용량 43g(235kcal). 확인: https://mukscan.com/p/1983030801093/누드빼빼로"},
 {"id":"pepero-whitecookie","name":"빼빼로 화이트쿠키","aliases":["화이트쿠키빼빼로","빼빼로화이트쿠키","화이트빼빼로"],"searchAliases":["화이트쿠키","화이트쿠키빼빼로","빼빼로화이트쿠키"],"brand":"롯데웰푸드","cat":"과자","unit":"1갑","kcal":185,"protein":3,"carbs":25,"fat":8,"sodium":140,"grams":37,"rank":4,"src":"식약처 식품영양성분DB 공공데이터(품목제조보고번호 19960242067454, 총내용량 37g, 기준일 2026-07-22). 확인: https://mukscan.com/p/19960242067454/화이트쿠키빼빼로"},
 {"id":"pepero-crunky","name":"빼빼로 크런키","aliases":["크런키빼빼로","빼빼로크런키"],"searchAliases":["크런키빼빼로","빼빼로크런키","크런키"],"brand":"롯데웰푸드","cat":"과자","unit":"1갑","kcal":205,"protein":3,"carbs":24,"fat":11,"sodium":130,"grams":39,"rank":5,"src":"식약처 식품영양성분DB 공공데이터(품목제조보고번호 19780614009498, 총내용량 39g, 기준일 2026-06-26). 확인: https://mukscan.com/p/19780614009498/크런키빼빼로"}
+,
+{"id":"fruit-hongsi","name":"홍시","aliases":["연시","홍시감","연시감","떫은감"],"searchAliases":["홍시","연시"],"cat":"과일","unit":"1회(80g)","kcal":55,"grams":80,"kcal100":69,"rank":1,"src":"농촌진흥청 국가표준식품성분표(식약처 식품영양성분DB 연계) 떫은감 연시 생것 100g당 69kcal. 가식부 80g은 2023 개정 식품교환표 과일군 1교환(연시 80g). 환산 69×80/100=55kcal"},
+{"id":"fruit-dangam","name":"단감","aliases":["단감1개"],"searchAliases":["단감"],"cat":"과일","unit":"1회(80g)","kcal":46,"grams":80,"kcal100":57,"rank":2,"src":"농촌진흥청 국가표준식품성분표 단감 생것 100g당 57kcal. 가식부 80g은 2023 개정 식품교환표 1교환(단감 50→80g). 환산 57×80/100=46kcal"},
+{"id":"fruit-gotgam","name":"곶감","aliases":["반건시","건시","말린감"],"searchAliases":["곶감"],"cat":"과일","unit":"100g","kcal":219,"protein":1.8,"carbs":58.9,"fat":0.1,"sodium":1,"grams":100,"kcal100":219,"rank":3,"src":"농촌진흥청 국가표준식품성분표 곶감(말린것·반건시) 100g당 219kcal·단백질 1.76g. 1개 중량의 공식 값이 없어 100g 단위로 수록(지어내지 않음)"},
+{"id":"fruit-apple","name":"사과","aliases":["사과1개","사과한개"],"searchAliases":["사과"],"cat":"과일","unit":"1회(100g)","kcal":52,"grams":100,"kcal100":52,"rank":4,"src":"농촌진흥청 국가표준식품성분표 사과 생것(대표) 100g당 52kcal. 가식부 100g은 2023 개정 식품교환표 1교환(사과 80→100g)"},
+{"id":"fruit-pear","name":"배","aliases":["배1개","신고배"],"searchAliases":["배"],"cat":"과일","unit":"1회(100g)","kcal":45,"grams":100,"kcal100":45,"rank":5,"src":"농촌진흥청 국가표준식품성분표 배 생것(대표) 100g당 45kcal. 가식부 100g은 식품교환표 과일군 1교환 참고 중량(2023 개정에서 배 중량 변경 없음)"},
+{"id":"fruit-mandarin","name":"감귤","aliases":["귤","밀감","제주감귤","감귤1개"],"searchAliases":["귤","밀감","감귤"],"cat":"과일","unit":"1회(120g)","kcal":47,"grams":120,"kcal100":39,"rank":6,"src":"농촌진흥청 국가표준식품성분표 감귤(귤) 생것 100g당 39kcal. 가식부 120g은 2023 식품교환표 1교환(감귤 120g). 환산 39×120/100=47kcal"},
+{"id":"fruit-banana","name":"바나나","aliases":["바나나1개"],"searchAliases":["바나나"],"cat":"과일","unit":"1회(80g)","kcal":62,"protein":0.9,"carbs":16,"fat":0.2,"sodium":0,"grams":80,"kcal100":77,"rank":7,"src":"농촌진흥청 국가표준식품성분표 바나나 생것 100g당 77kcal·단백질 1.11g. 가식부 80g은 2023 개정 식품교환표 1교환(바나나 50→80g). 환산 77×80/100=62kcal"},
+{"id":"fruit-strawberry","name":"딸기","aliases":["딸기1컵"],"searchAliases":["딸기"],"cat":"과일","unit":"1회(150g)","kcal":50,"grams":150,"kcal100":33,"rank":8,"src":"농촌진흥청 국가표준식품성분표 딸기 생것(대표) 100g당 33kcal. 가식부 150g은 2023 식품교환표 1교환(딸기 150g, 개정에서 변경 없음). 환산 33×150/100=50kcal"},
+{"id":"fruit-grape","name":"포도","aliases":["거봉","캠벨포도","캠벨얼리"],"searchAliases":["포도"],"cat":"과일","unit":"1회(80g)","kcal":46,"grams":80,"kcal100":57,"rank":9,"src":"농촌진흥청 국가표준식품성분표 포도 생것(대표·캠벨얼리·거봉 100g당 57kcal). 가식부 80g은 2023 식품교환표 포도류 1교환 80g. 환산 57×80/100=46kcal"},
+{"id":"fruit-shine","name":"샤인머스캣","aliases":["샤인머스켓","샤인"],"searchAliases":["샤인머스캣","샤인머스켓","샤인"],"cat":"과일","unit":"1회(80g)","kcal":53,"protein":0.3,"carbs":14.1,"fat":0.1,"sodium":1,"grams":80,"kcal100":66,"rank":10,"src":"농촌진흥청 국가표준식품성분표 포도 샤인머스캣 생것(껍질 포함) 100g당 66kcal·단백질 0.38g. 가식부 80g은 2023 식품교환표 포도(샤인머스캣) 분류의 생과일 포도류 1교환 80g. 환산 66×80/100=53kcal"},
+{"id":"fruit-watermelon","name":"수박","aliases":["수박조각","수박1조각"],"searchAliases":["수박"],"cat":"과일","unit":"1회(150g)","kcal":45,"protein":1.2,"carbs":11.7,"fat":0.1,"grams":150,"kcal100":30,"rank":11,"src":"농촌진흥청 국가표준식품성분표 수박(적육) 생것 100g당 30kcal. 가식부 150g은 2023 식품교환표 1교환(수박 150g, 개정에서 변경 없음). 환산 30×150/100=45kcal"},
+{"id":"fruit-chamoe","name":"참외","aliases":["참외1개"],"searchAliases":["참외"],"cat":"과일","unit":"1회(100g)","kcal":40,"grams":100,"kcal100":40,"rank":12,"src":"농촌진흥청 국가표준식품성분표 참외 생것 100g당 40kcal. 가식부 100g은 2023 개정 식품교환표 1교환(참외 150→100g)"},
+{"id":"fruit-peach","name":"복숭아","aliases":["백도","황도","백도복숭아","황도복숭아"],"searchAliases":["복숭아"],"cat":"과일","unit":"1회(100g)","kcal":49,"grams":100,"kcal100":49,"rank":13,"src":"농촌진흥청 국가표준식품성분표 복숭아 생것(백도·황도 대표 49kcal/100g). 가식부 100g은 2023 개정 식품교환표 1교환(백도·황도 150→100g)"},
+{"id":"fruit-kiwi","name":"키위","aliases":["그린키위","키위프루트"],"searchAliases":["키위"],"cat":"과일","unit":"1회(80g)","kcal":49,"grams":80,"kcal100":61,"rank":14,"src":"농촌진흥청 국가표준식품성분표 키위(그린) 생것 100g당 61kcal. 가식부 80g은 2023 식품교환표 1교환(그린키위 80g). 환산 61×80/100=49kcal"},
+{"id":"fruit-blueberry","name":"블루베리","aliases":["블루베리1컵"],"searchAliases":["블루베리"],"cat":"과일","unit":"1회(100g)","kcal":43,"grams":100,"kcal100":43,"rank":15,"src":"농촌진흥청 국가표준식품성분표 블루베리 생것 100g당 43kcal. 가식부 100g은 2023 개정 식품교환표 1교환(블루베리 80→100g)"},
+{"id":"fruit-tomato","name":"토마토","aliases":["토마토1개"],"searchAliases":["토마토"],"cat":"과일","unit":"1회(250g)","kcal":48,"protein":1.9,"carbs":10.7,"fat":0.5,"sodium":5,"grams":250,"kcal100":19,"rank":16,"src":"농촌진흥청 국가표준식품성분표 토마토 생것 100g당 19kcal·단백질 0.77g. 가식부 250g은 2023 개정 식품교환표 1교환(토마토 350→250g). 환산 19×250/100=48kcal"},
+{"id":"fruit-cherrytomato","name":"방울토마토","aliases":["방울 토마토","체리토마토"],"searchAliases":["방울토마토"],"cat":"과일","unit":"1회(200g)","kcal":50,"grams":200,"kcal100":25,"rank":17,"src":"농촌진흥청 국가표준식품성분표 방울토마토 생것 100g당 25kcal. 가식부 200g은 2023 개정 식품교환표 1교환(방울토마토 300→200g). 환산 25×200/100=50kcal"},
+{"id":"fruit-orange","name":"오렌지","aliases":["오렌지1개"],"searchAliases":["오렌지"],"cat":"과일","unit":"1회(100g)","kcal":47,"grams":100,"kcal100":47,"rank":18,"src":"농촌진흥청 국가표준식품성분표 오렌지 생것 100g당 47kcal. 가식부 100g은 2023 식품교환표 1교환(오렌지 100g)"},
+{"id":"fruit-grapefruit","name":"자몽","aliases":["그레이프프루트","자몽1/2개"],"searchAliases":["자몽"],"cat":"과일","unit":"1회(150g)","kcal":48,"grams":150,"kcal100":32,"rank":19,"src":"농촌진흥청 국가표준식품성분표 자몽 생것 100g당 32kcal. 가식부 150g은 2023 식품교환표 1교환(자몽 150g, 개정에서 변경 없음). 환산 32×150/100=48kcal"},
+{"id":"fruit-mango","name":"망고","aliases":["망고과육"],"searchAliases":["망고"],"cat":"과일","unit":"100g","kcal":59,"grams":100,"kcal100":59,"rank":20,"src":"농촌진흥청 국가표준식품성분표 망고 생것(대표) 100g당 59kcal. 일반 망고의 공식 1개 중량을 확인하지 못해 100g 단위로 수록"},
+{"id":"fruit-pineapple","name":"파인애플","aliases":["파인애플조각"],"searchAliases":["파인애플"],"cat":"과일","unit":"1회(100g)","kcal":53,"grams":100,"kcal100":53,"rank":21,"src":"농촌진흥청 국가표준식품성분표 파인애플 생것 100g당 53kcal. 가식부 100g은 2023 개정 식품교환표 1교환(파인애플 200→100g)"},
+{"id":"fruit-cherry","name":"체리","aliases":["체리10개"],"searchAliases":["체리"],"cat":"과일","unit":"1회(80g)","kcal":46,"grams":80,"kcal100":57,"rank":22,"src":"농촌진흥청 국가표준식품성분표 체리 생것 100g당 57kcal. 가식부 80g은 2023 식품교환표 1교환(체리 80g). 환산 57×80/100=46kcal"}
 ];
-const api={SOURCE,FOODS,count:FOODS.length};
+function nutritionForPlace(dish,place){
+  place=place!=null?place:(typeof mealPlace!=='undefined'?mealPlace:'');
+  if(!dish)return dish;
+  if(place==='home'&&dish.home&&dish.home.kcal!=null)return Object.assign({},dish,dish.home);
+  return dish;
+}
+const api={SOURCE,FOODS,count:FOODS.length,nutritionForPlace};
 root.DGFoods=api;
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);

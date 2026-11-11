@@ -28,7 +28,12 @@ const SEARCH_SYNONYMS={
   '짜장':['짜장면'],
   '떡볶이':['떡볶이'],
   '페페로':['빼빼로'],
-  '빼배로':['빼빼로']
+  '빼배로':['빼빼로'],
+  '귤':['감귤','밀감'],
+  '밀감':['감귤','귤'],
+  '연시':['홍시'],
+  '샤인머스켓':['샤인머스캣'],
+  '샤인':['샤인머스캣']
 };
 
 // 0.4.9: 이 별칭은 질의가 별칭 전체를 다 입력했을 때만 맞춰요. ('치킨' 검색에 별칭 '치킨랩' 때문에 샐러드랩이 섞이던 문제)
@@ -194,7 +199,9 @@ function resultHTML(hits,query){
     return `<div class="meal-search-hint">‘${esc(query)}’에 맞는 메뉴가 없어요. 이름을 직접 적어도 기록할 수 있어요.</div>`;
   }
   return hits.map(h=>{
-    const f=h.item;
+    const raw=h.item;
+    const fn=(root.DGFoods&&DGFoods.nutritionForPlace);
+    const f=fn?fn(raw,typeof mealPlace!=='undefined'?mealPlace:''):raw;
     const kcal=Math.round(+f.kcal||0);
     const sub=[f.brand,f.cat,f.unit||'1인분'].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(' · ');
     return `<button type="button" class="meal-search-item" data-food-id="${esc(f.id)}" onclick="DGFoodSearch.pick('${escJs(f.id)}')">
