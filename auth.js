@@ -1,4 +1,4 @@
-// 다이어트 게임 0.4.1 — Google 로그인·동기화 (Supabase Auth, 기획서 v3 6절)
+// 다이어트 게임 0.4.2 — Google 로그인·동기화 (Supabase Auth, 기획서 v3 6절)
 // SB_ANON은 공개용 anon 키입니다. service_role·관리 토큰·DB 비밀번호는 넣지 않습니다.
 const SB_URL='https://ifdgncmhpclthudlvowe.supabase.co';
 const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmZGduY21ocGNsdGh1ZGx2b3dlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzNDgzMTAsImV4cCI6MjEwOTkyNDMxMH0.XFJoRuKM0FOxmK2fbHb7kkdO_2dKp_RN-YIflWiJzvw';
@@ -232,7 +232,7 @@ const DGAuth=(function(){
     const el=$('#gate');
     el.className='on';
     if(html)el.innerHTML=html;
-    else if(mode==='wait')el.innerHTML=`<div class="gwrap"><img src="char.png" alt="" class="gchar"><h1>다이어트 게임</h1><p class="muted">로그인하고 있어요…</p></div>`;
+    else if(mode==='wait')el.innerHTML=`<div class="gate-night"><div class="gate-stars" aria-hidden="true"></div><div class="gate-inner"><div class="gate-char"><img src="char.png" alt=""></div><h1 style="color:#fff;font-size:36px;line-height:44px;font-weight:900;margin-top:28px">다이어트 게임</h1><p style="margin:8px 0 0;color:#C3C8EE;font-size:16px">로그인하고 있어요…</p></div></div>`;
     $('#nav').style.display='none';
   }
   function hideGate(){
@@ -242,15 +242,16 @@ const DGAuth=(function(){
     $('#nav').style.display='';
   }
   function loginHTML(){
-    return `<div class="gwrap">
-      <img src="char.png" alt="캐릭터" class="gchar">
-      <h1>다이어트 게임</h1>
-      <p class="gsub">기록할수록 레벨업, 빠질수록 변신</p>
-      <div class="gpills"><span>퀘스트</span><span>레벨업</span><span>아바타 변신</span></div>
-      <button class="gbtn" onclick="DGAuth.startGoogle()"><svg viewBox="0 0 48 48" width="22" height="22" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.2 6.1 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 12 24 12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.2 6.1 29.4 4 24 4 16.3 4 9.6 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.5-5.2l-6.2-5.2C29.3 35.5 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1.1 3.2-3.5 5.8-6.6 7.2l6.2 5.2C37.1 41.5 44 36 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>Google 계정으로 시작하기</button>
-      <button class="gbtn gbtnout" onclick="DGAuth.continueGuest()">게스트로 계속하기</button>
-      <p class="gnote">얼굴 사진은 폰에만 저장돼요<br>게스트 기록은 나중에 계정으로 옮길 수 있어요</p>
-    </div>`;
+    return `<div class="gate-night"><div class="gate-stars" aria-hidden="true"></div>
+      <div class="gate-inner">
+      <div class="gate-char"><img src="char.png" alt="캐릭터"></div>
+      <h1 style="color:#fff;font-size:36px;line-height:44px;font-weight:900;letter-spacing:-.03em;margin-top:28px">다이어트 게임</h1>
+      <p style="margin:8px 0 18px;color:#C3C8EE;font-size:16px">기록할수록 레벨업, 빠질수록 변신</p>
+      <div style="display:flex;gap:8px;justify-content:center;margin-bottom:36px;flex-wrap:wrap"><span class="stat-chip glass">📋 퀘스트</span><span class="stat-chip glass">⬆️ 레벨업</span><span class="stat-chip glass">🧍 아바타 변신</span></div>
+      <button type="button" class="btn-secondary btn-lg" style="border:0;margin-bottom:12px;font-weight:800" onclick="DGAuth.startGoogle()"><svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.2 6.1 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 12 24 12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.2 6.1 29.4 4 24 4 16.3 4 9.6 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.5-5.2l-6.2-5.2C29.3 35.5 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1.1 3.2-3.5 5.8-6.6 7.2l6.2 5.2C37.1 41.5 44 36 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg> Google 계정으로 시작하기</button>
+      <button type="button" class="btn-ghost btn-lg" style="color:#fff;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35)" onclick="DGAuth.continueGuest()">게스트로 계속하기</button>
+      <p class="gnote">🔒 얼굴 사진은 폰에만 저장돼요<br>게스트 기록은 나중에 계정으로 옮길 수 있어요</p>
+      </div></div>`;
   }
   function showLogin(){showGate('login',loginHTML());}
 
@@ -322,15 +323,15 @@ const DGAuth=(function(){
   function askConflict(localE,remoteE){
     const L=summaryOf(localE), R=summaryOf(remoteE);
     return new Promise(res=>{
-      const box=`<div class="gwrap" style="text-align:left">
+      const box=`<div class="gate-form"><div class="gwrap">
         <h2 style="text-align:center;margin:8px 0 12px">기록이 둘 다 있어요</h2>
         <p class="muted">이 폰과 계정 기록을 어떻게 할까요? 덮기 전에 반대쪽은 이 폰에 백업해 둡니다.</p>
         <div class="card"><b>이 폰</b><div class="muted">${L.from} ~ ${L.to} · ${L.n}건<br>누적 ${L.xp} XP (Lv.${L.level}) · 최근 ${(+L.weight).toFixed(1)}kg</div></div>
         <div class="card"><b>계정</b><div class="muted">${R.from} ~ ${R.to} · ${R.n}건<br>누적 ${R.xp} XP (Lv.${R.level}) · 최근 ${(+R.weight).toFixed(1)}kg</div></div>
-        <button class="btn" style="width:100%" onclick="DGAuth._pick('phone')">이 폰 기록으로 덮기</button>
-        <button class="btn g" style="width:100%" onclick="DGAuth._pick('account')">계정 기록으로 덮기</button>
-        <button class="btn c" style="width:100%" onclick="DGAuth._pick('merge')">합치기</button>
-      </div>`;
+        <button type="button" class="btn-secondary btn-block" onclick="DGAuth._pick('phone')">이 폰 기록으로 덮기</button>
+        <button type="button" class="btn-secondary btn-block" style="margin-top:8px" onclick="DGAuth._pick('account')">계정 기록으로 덮기</button>
+        <button type="button" class="btn-primary btn-block" style="margin-top:8px" onclick="DGAuth._pick('merge')">합치기</button>
+      </div></div>`;
       showGate('merge',box);
       DGAuth._pick=(k)=>{DGAuth._pick=()=>{};res(k);};
     });
@@ -339,16 +340,16 @@ const DGAuth=(function(){
   function confirmProfile(){
     return new Promise(res=>{
       const C=compute();
-      const box=`<div class="gwrap" style="text-align:left">
-        <h2 style="text-align:center">프로필 확인</h2>
+      const box=`<div class="gate-form"><div class="gwrap">
+        <h2 style="text-align:center;margin-bottom:8px">프로필 확인</h2>
         <p class="muted">키는 186cm로 고정이에요. 목표만 수정할 수 있어요.</p>
-        <div class="row"><label class="fld">키(cm)<input type="number" value="${HEIGHT}" disabled></label>
-          <label class="fld">시작 체중(kg)<input type="number" value="${START_W}" disabled></label></div>
-        <label class="fld">현재 체중(kg)<input id="pfW" type="number" step="0.1" value="${C.weight.toFixed(1)}" disabled></label>
-        <label class="fld">이번 달 목표(kg)<input id="pfM" type="number" step="0.5" value="${settings.month}"></label>
-        <label class="fld">장기 목표(kg)<input id="pfG" type="number" step="0.5" value="${settings.goal}"></label>
-        <button class="btn" style="width:100%;margin-top:10px" onclick="DGAuth._saveProfile()">시작하기</button>
-      </div>`;
+        <div class="rowx" style="margin-bottom:10px"><label class="field"><span class="label">키(cm) 🔒</span><input class="input" type="number" value="${HEIGHT}" disabled></label>
+          <label class="field"><span class="label">시작 체중(kg)</span><input class="input" type="number" value="${START_W}" disabled></label></div>
+        <label class="field" style="margin-bottom:10px"><span class="label">현재 체중(kg)</span><input class="input" id="pfW" type="number" step="0.1" value="${C.weight.toFixed(1)}" disabled></label>
+        <label class="field" style="margin-bottom:10px"><span class="label">이번 달 목표(kg)</span><input class="input" id="pfM" type="number" step="0.5" value="${settings.month}"></label>
+        <label class="field" style="margin-bottom:14px"><span class="label">장기 목표(kg)</span><input class="input" id="pfG" type="number" step="0.5" value="${settings.goal}"></label>
+        <button type="button" class="btn-primary btn-lg" onclick="DGAuth._saveProfile()">시작하기</button>
+      </div></div>`;
       showGate('profile',box);
       DGAuth._saveProfile=()=>{
         const m=+$('#pfM').value,g=+$('#pfG').value;
@@ -405,24 +406,31 @@ const DGAuth=(function(){
     }catch(e){setSyncOn(false,'동기화 실패 · 나중에 다시 시도');toast('올리지 못했어요');}
   }
 
+  const GICO='<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.2 6.1 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 12 24 12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.2 6.1 29.4 4 24 4 16.3 4 9.6 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.5-5.2l-6.2-5.2C29.3 35.5 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1.1 3.2-3.5 5.8-6.6 7.2l6.2 5.2C37.1 41.5 44 36 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>';
   function accountCard(){
     if(!session||!session.user){
-      return `<div class="card" id="accountCard"><h3>계정</h3>
-        <div>게스트로 이용 중</div>
-        <div class="muted">기록은 이 폰에만 저장돼요. Google 계정으로 백업하고 다른 기기와 맞출 수 있어요.</div>
-        <button class="gbtn" style="margin-top:10px" onclick="DGAuth.startGoogle()"><svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.2 6.1 29.4 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 12 24 12c3.1 0 5.8 1.1 8 3l5.7-5.7C34.2 6.1 29.4 4 24 4 16.3 4 9.6 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.5-5.2l-6.2-5.2C29.3 35.5 26.8 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-1.1 3.2-3.5 5.8-6.6 7.2l6.2 5.2C37.1 41.5 44 36 44 24c0-1.2-.1-2.3-.4-3.5z"/></svg>Google 계정으로 시작하기</button>
+      return `<div class="card" id="accountCard" style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+        <div style="width:48px;height:48px;border-radius:50%;background:var(--mint-50);display:grid;place-items:center;font-size:22px;flex:none">👤</div>
+        <div style="flex:1;min-width:0"><b style="color:var(--ink-900)">게스트로 이용 중</b>
+          <div class="muted">기록은 이 폰에만 저장돼요. Google 계정으로 백업하고 다른 기기와 맞출 수 있어요.</div></div>
+        <button type="button" class="btn-secondary btn-block" style="margin-top:4px" onclick="DGAuth.startGoogle()">${GICO} Google 계정으로 시작하기</button>
       </div>`;
     }
     const u=session.user;
     const who=(u.email||u.name||'로그인됨');
     const canUpload=!syncOn;
-    return `<div class="card" id="accountCard"><h3>계정</h3>
-      <div>로그인됨 · ${who}</div>
-      <div class="muted" id="syncStatus">${syncText}</div>
-      <div class="muted">얼굴 사진은 계정에 올리지 않고 이 폰에만 둡니다.</div>
-      ${canUpload?'<button class="btn" style="width:100%" onclick="DGAuth.uploadNow()">이 폰 기록을 계정에 올리기</button>':''}
-      <div class="row" style="margin-top:8px"><button class="btn g" onclick="DGAuth.logout()">로그아웃</button><button class="btn c" onclick="DGAuth.deleteAccount()">계정 삭제</button></div>
+    return `<div class="card" id="accountCard" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+      <div style="width:48px;height:48px;border-radius:50%;background:var(--mint-50);display:grid;place-items:center;font-size:22px;flex:none">☁️</div>
+      <div style="flex:1;min-width:0"><b style="color:var(--ink-900)">로그인됨</b>
+        <div class="muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${who} · <span id="syncStatus" style="color:var(--mint-700);font-weight:700">${syncText}</span></div></div>
+      ${canUpload?'<button type="button" class="btn-primary btn-block" onclick="DGAuth.uploadNow()">이 폰 기록을 계정에 올리기</button>':''}
     </div>`;
+  }
+  function accountActions(){
+    if(!session||!session.user)return '';
+    return `<div class="card"><h3>계정</h3><div class="muted" style="margin-bottom:10px">얼굴 사진은 계정에 올리지 않고 이 폰에만 둡니다.</div>
+      <div class="rowx"><button type="button" class="btn-secondary" onclick="DGAuth.logout()">로그아웃</button>
+      <button type="button" class="btn-ghost" style="color:var(--coral-600);box-shadow:inset 0 0 0 1.5px #FFC9C2" onclick="DGAuth.deleteAccount()">계정 삭제</button></div></div>`;
   }
 
   async function quietSync(){
@@ -487,7 +495,7 @@ const DGAuth=(function(){
 
   return {
     boot, startGoogle, continueGuest, openLogin, logout, deleteAccount, uploadNow,
-    schedulePush, accountCard, mergeEvents, isDefaultLocal,
+    schedulePush, accountCard, accountActions, mergeEvents, isDefaultLocal,
     get session(){return session;},
     setSession(s){session=s;},
     setSync(on,text){setSyncOn(on,text);}
