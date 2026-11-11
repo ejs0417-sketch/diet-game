@@ -1,0 +1,44 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#5cc79a"><link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png"><title>다이어트 게임</title>
+<style>
+:root{--mint:#5cc79a;--mint2:#dff3e8;--coral:#f37b72;--bg:#eef8f2;--txt:#222}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;background:var(--bg);color:var(--txt)}
+main{padding:14px 14px 90px;max-width:520px;margin:auto}
+.card{background:#fff;border-radius:18px;padding:14px;margin:10px 0;box-shadow:0 2px 8px #0001}
+.top{display:flex;align-items:center;gap:10px}.badge{width:64px;height:64px;border-radius:16px;background:var(--mint);color:#fff;font-weight:800;font-size:20px;display:flex;align-items:center;justify-content:center;border:4px solid #bfe9d4}
+.bar{height:16px;background:#e6e6e6;border-radius:9px;overflow:hidden;position:relative}.bar i{display:block;height:100%;background:var(--mint)}.bar.c i{background:var(--coral)}
+.bar span{position:absolute;inset:0;font-size:11px;color:#fff;text-align:center;line-height:16px;font-weight:700;text-shadow:0 0 2px #0006}
+.coin{margin-left:auto;background:#fff;border-radius:22px;padding:8px 14px;font-weight:800;box-shadow:0 2px 6px #0001}
+.hero{display:flex;gap:10px;align-items:center}.hero img{width:52%;max-width:220px}
+.avatar{position:relative;width:52%;max-width:240px;height:290px;border-radius:18px;background:radial-gradient(ellipse at 50% 40%,#f6fffa 0%,#dff3e8 75%);overflow:hidden;flex:none}
+.avatar.big{width:100%;max-width:none;height:400px}
+.avatar .fallback{width:100%;height:100%;object-fit:contain;max-width:none}
+.avatar canvas{position:absolute;inset:0}
+.avcap{position:absolute;left:6px;right:6px;bottom:6px;text-align:center;font-size:11px;color:#2f7a58;background:#ffffffcc;border-radius:10px;padding:3px 4px;pointer-events:none;z-index:1}
+.avatar.big .avcap{font-size:14px;font-weight:700;color:#c4554c}
+.fld{display:block;font-size:13px;color:#666}.pvbtn .btn{font-size:13px;padding:8px 4px}
+label.btn{border-radius:12px;background:var(--mint);color:#fff;font-weight:700;padding:10px 12px;font-size:15px;margin:3px}
+input[type=range]{accent-color:var(--coral);height:28px}
+.wt{flex:1;text-align:center}.wt b{font-size:34px;color:var(--coral);display:block}
+.warn{background:#fff1ef;border:1px solid var(--coral);color:#b33;border-radius:12px;padding:10px;margin:8px 0;font-size:14px}
+.q{display:flex;align-items:center;gap:10px}.q .ic{font-size:28px;width:48px;height:48px;border-radius:50%;background:var(--mint2);display:flex;align-items:center;justify-content:center}
+.q .b{flex:1}.q h4{margin:0 0 4px}.pill{background:var(--coral);color:#fff;border-radius:16px;padding:6px 10px;font-size:13px;font-weight:700;white-space:nowrap}.pill.done{background:var(--mint)}
+nav{position:fixed;bottom:0;left:0;right:0;background:#fff;display:flex;box-shadow:0 -2px 8px #0001;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;padding:10px 0;font-size:12px;color:#777}nav button.on{color:var(--mint);font-weight:800}nav button div{font-size:22px}
+button.btn{border:0;border-radius:12px;background:var(--mint);color:#fff;font-weight:700;padding:10px 12px;font-size:15px;margin:3px}
+button.btn.g{background:#ccc;color:#333}button.btn.c{background:var(--coral)}
+input,select{font-size:16px;padding:9px;border:1px solid #ccc;border-radius:10px;width:100%;margin:4px 0}
+.row{display:flex;gap:6px}.row>*{flex:1}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{padding:5px 3px;border-bottom:1px solid #eee;text-align:left}
+.muted{color:#888;font-size:13px}h3{margin:6px 0}
+.toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:10px 16px;border-radius:20px;z-index:9;display:none}
+.ach{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #eee}.ach .ic{font-size:26px}.ach.no{opacity:.45}
+</style></head><body>
+<main id="view"></main>
+<nav id="nav"></nav><div class="toast" id="toast"></div>
+<script src="app.js"></script>
+<script type="module" src="avatar.js"></script>
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');</script>
+</body></html>
