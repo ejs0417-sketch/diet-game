@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""0.4.15 E2E: home coach cards, body morph 0/50/100, franchise search, version badge, 집밥, consecutive search, short viewport, SW update."""
+"""0.4.16 E2E: home coach cards, body morph 0/50/100, franchise search, version badge, 집밥, consecutive search, short viewport, SW update."""
 from __future__ import annotations
 import http.server, json, os, socket, sys, threading, time
 from functools import partial
@@ -7,7 +7,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent
-SHOT_DIR = Path('/tmp/e2e-0.4.15')
+SHOT_DIR = Path('/tmp/e2e-0.4.16')
 FINAL_SHOT = Path('/workspace/다이어트게임-0.4.15-집밥선택.png')
 HOME_SHOT = Path('/workspace/다이어트게임-0.4.15-버전표시.png')
 FRUIT_SHOT = Path('/workspace/다이어트게임-0.4.15-과일검색.png')
@@ -100,6 +100,25 @@ def search_state(page):
         nav:(document.querySelector('nav#nav button[aria-current="page"]')||{}).innerText||''};
     }''')
 
+
+def open_log_tab(page):
+    page.locator('nav#nav button', has_text='기록').click()
+    page.wait_for_selector('#mealRegisterBtn, #eatenToday, #mealMenu', timeout=8000)
+    page.wait_for_timeout(150)
+
+def open_composer(page):
+    if page.locator('#mealMenu').is_visible():
+        return
+    k=page.locator('[data-seg="kind"] button', has_text='식사')
+    if k.count() and k.get_attribute('aria-selected')!='true':
+        k.click()
+        page.wait_for_timeout(150)
+    btn=page.locator('#mealRegisterBtn')
+    if btn.count():
+        btn.click()
+    page.wait_for_selector('#mealMenu', timeout=8000)
+    page.wait_for_timeout(120)
+
 def assert_search_visible(page, label, shot):
     st = search_state(page)
     page.screenshot(path=str(SHOT_DIR / f'{shot}.png'))
@@ -186,10 +205,10 @@ def main():
             browser,ctx,page=launch(p,412,915)
             guest(page,url)
             ver=page.evaluate('()=>typeof VERSION!=="undefined"?VERSION:null')
-            if ver!='0.4.15':
-                FAILS.append(f'로컬 버전이 0.4.15가 아님: {ver}')
+            if ver!='0.4.16':
+                FAILS.append(f'로컬 버전이 0.4.16가 아님: {ver}')
             badge=page.locator('.ver-badge')
-            if badge.count()==0 or 'v0.4.15' not in badge.first.inner_text():
+            if badge.count()==0 or 'v0.4.16' not in badge.first.inner_text():
                 FAILS.append(f'홈 버전 배지 없음: {badge.count()}')
             page.wait_for_timeout(400)
             page.screenshot(path=str(HOME_SHOT))
@@ -198,6 +217,11 @@ def main():
             page.screenshot(path='/workspace/다이어트게임-0.4.15-홈.png')
             log('SHOT', '/workspace/다이어트게임-0.4.15-홈.png')
             # 0.4.15 홈 카드: 예상 체중·저녁 추천·홈트
+            if page.locator('#dinnerCard').count():
+                page.locator('#dinnerCard').first.scroll_into_view_if_needed()
+                page.wait_for_timeout(200)
+                page.locator('#dinnerCard').first.screenshot(path='/workspace/다이어트게임-0.4.16-다음식사추천.png')
+                log('SHOT', '/workspace/다이어트게임-0.4.16-다음식사추천.png')
             for sel, dest in (
                 ('#forecastCard', Path('/workspace/다이어트게임-0.4.15-예상체중.png')),
                 ('#dinnerCard', Path('/workspace/다이어트게임-0.4.15-저녁추천.png')),
@@ -218,6 +242,8 @@ def main():
             else:
                 page.locator('#nextDayCard').first.scroll_into_view_if_needed()
                 page.locator('#nextDayCard').first.screenshot(path='/workspace/다이어트게임-0.4.15-내일식단.png')
+                page.locator('#nextDayCard').first.screenshot(path='/workspace/다이어트게임-0.4.16-내일식단레시피.png')
+                log('SHOT', '/workspace/다이어트게임-0.4.16-내일식단레시피.png')
             # 홈트 오버레이가 render에 안 지워지는지 연 뒤 닫기
             if page.locator('#workoutCard').count():
                 page.locator('#workoutCard button', has_text='이 단계 시작').click()
@@ -227,20 +253,22 @@ def main():
                 page.locator('#hwPane').screenshot(path='/workspace/다이어트게임-0.4.15-홈트타이머.png')
                 page.locator('#hwPane button', has_text='닫기').click()
                 page.wait_for_timeout(200)
-            page.locator('nav#nav button', has_text='기록').click()
-            page.wait_for_selector('#mealMenu', timeout=8000)
-            page.wait_for_timeout(200)
-            assert_search_visible(page, 'fresh-nav enter', 'fresh-nav-enter')
-            if page.locator('.log-head .ver-badge', has_text='v0.4.15').count()==0:
+            open_log_tab(page)
+            if page.locator('#eatenToday').count()==0 and page.locator('#mealRegisterBtn').count()==0:
+                FAILS.append('기록 탭에 오늘 먹은 것/등록하기 없음')
+            if page.locator('.log-head .ver-badge', has_text='v0.4.16').count()==0:
                 FAILS.append('기록 헤더 버전 배지 없음')
+            page.screenshot(path='/workspace/다이어트게임-0.4.16-오늘먹은것.png')
+            log('SHOT', '/workspace/다이어트게임-0.4.16-오늘먹은것.png')
             page.screenshot(path='/workspace/다이어트게임-0.4.15-기록.png')
-            log('SHOT', '/workspace/다이어트게임-0.4.15-기록.png')
+            open_composer(page)
+            assert_search_visible(page, 'fresh-nav enter', 'fresh-nav-enter')
             page.locator('nav#nav button', has_text='업적').click()
             page.wait_for_timeout(250)
             page.screenshot(path='/workspace/다이어트게임-0.4.15-업적.png')
             log('SHOT', '/workspace/다이어트게임-0.4.15-업적.png')
-            page.locator('nav#nav button', has_text='기록').click()
-            page.wait_for_selector('#mealMenu', timeout=8000)
+            open_log_tab(page)
+            open_composer(page)
             # 과일 검색 스크린샷
             inp=page.locator('#mealMenu')
             inp.fill('')
@@ -319,13 +347,21 @@ def main():
             # 2) fresh, short 360x520 (실사용에서 검색창이 사라지던 크기)
             browser,ctx,page=launch(p,360,520)
             guest(page,url)
-            page.locator('nav#nav button', has_text='기록').click()
-            page.wait_for_selector('#mealMenu', timeout=8000)
-            page.wait_for_timeout(200)
-            # first reveal may be needed if search starts under tab bar
+            open_log_tab(page)
+            if page.locator('#mealMenu').is_visible():
+                FAILS.append('짧은 화면에서 기록 탭을 열자마자 검색창이 보이면 안 됨')
+            open_composer(page)
             page.evaluate('()=>{if(typeof revealMealSearch==="function")revealMealSearch();}')
             page.wait_for_timeout(150)
             assert_search_visible(page, 'fresh-short enter', 'fresh-short-enter')
+            # 키보드가 열린 것처럼 뷰포트를 줄여 검색창이 남아 있는지 확인
+            page.set_viewport_size({'width':360,'height':360})
+            page.wait_for_timeout(200)
+            page.evaluate('()=>{if(typeof revealMealSearch==="function")revealMealSearch();}')
+            page.wait_for_timeout(150)
+            assert_search_visible(page, 'fresh-short keyboard', 'fresh-short-keyboard')
+            page.set_viewport_size({'width':360,'height':520})
+            page.wait_for_timeout(100)
             page.locator('[data-seg="place"] button', has_text='집밥').click()
             page.wait_for_timeout(80)
             add_three(page, 'fresh-short', '점심')
@@ -363,16 +399,14 @@ def main():
             # 5) 체중 기록으로 들어간 뒤 식사가 아니면 전환, 야식 3개
             browser,ctx,page=launch(p,412,915)
             guest(page,url)
-            page.locator('nav#nav button', has_text='기록').click()
-            page.wait_for_timeout(200)
+            open_log_tab(page)
             k=page.locator('[data-seg="kind"] button', has_text='체중')
             if k.count(): k.click()
             page.wait_for_timeout(200)
-            if not page.locator('#mealMenu').is_visible():
-                k=page.locator('[data-seg="kind"] button', has_text='식사')
-                if k.count(): k.click()
-                page.wait_for_timeout(200)
-            page.wait_for_selector('#mealMenu', timeout=8000)
+            k=page.locator('[data-seg="kind"] button', has_text='식사')
+            if k.count(): k.click()
+            page.wait_for_timeout(200)
+            open_composer(page)
             assert_search_visible(page, 'wcard enter', 'wcard-enter')
             add_three(page, 'wcard', '야식')
             browser.close()
@@ -380,14 +414,14 @@ def main():
             # 6) 점저 슬롯 (remaining slot)
             browser,ctx,page=launch(p,412,915)
             guest(page,url)
-            page.locator('nav#nav button', has_text='기록').click()
-            page.wait_for_selector('#mealMenu', timeout=8000)
+            open_log_tab(page)
+            open_composer(page)
             add_three(page, 'slot-점저', '점저')
             browser.close()
 
-            # 7) SW 0.4.10 캐시: 첫 기록은 홈으로 나감(옛 버그). 서버를 0.4.15로 바꾼 뒤
+            # 7) SW 0.4.10 캐시: 첫 기록은 홈으로 나감(옛 버그). 서버를 0.4.16로 바꾼 뒤
             #    update()를 시도하고, 0.4.10 페이지에는 자동새로고침이 없으므로
-            #    한 번 새로고침(앱을 다시 연 것과 같음, network-first) 후 0.4.15 연속 추가를 확인.
+            #    한 번 새로고침(앱을 다시 연 것과 같음, network-first) 후 0.4.16 연속 추가를 확인.
             httpd.legacy = True
             browser,ctx,page=launch(p,412,915)
             guest(page, url)
@@ -410,7 +444,7 @@ def main():
             except Exception as e:
                 log('update() call', type(e).__name__, e)
             try:
-                page.wait_for_function('() => typeof VERSION!=="undefined" && VERSION==="0.4.15"', timeout=4000)
+                page.wait_for_function('() => typeof VERSION!=="undefined" && VERSION==="0.4.16"', timeout=4000)
             except Exception:
                 page.reload(wait_until='domcontentloaded', timeout=20000)
             page.wait_for_timeout(500)
@@ -420,8 +454,8 @@ def main():
             ver2=page.evaluate('()=>typeof VERSION!=="undefined"?VERSION:null')
             log('SW after update/reload VERSION', ver2)
             page.screenshot(path=str(SHOT_DIR/'sw-updated-home.png'))
-            if ver2!='0.4.15':
-                FAILS.append(f'SW 업데이트 후 버전이 0.4.15가 아님: {ver2}')
+            if ver2!='0.4.16':
+                FAILS.append(f'SW 업데이트 후 버전이 0.4.16가 아님: {ver2}')
             else:
                 deadline=time.time()+12
                 while time.time()<deadline:
@@ -434,14 +468,14 @@ def main():
                 if page.get_by_text('게스트로 계속하기').count():
                     page.get_by_text('게스트로 계속하기').click()
                     page.wait_for_selector('nav#nav', timeout=20000)
-                page.locator('nav#nav button', has_text='기록').click()
-                page.wait_for_selector('#mealMenu', timeout=8000)
+                open_log_tab(page)
+                open_composer(page)
                 st=assert_search_visible(page, 'sw-updated enter', 'sw-updated-enter')
-                if st.get('version')!='0.4.15' or not st.get('inView'):
+                if st.get('version')!='0.4.16' or not st.get('inView'):
                     FAILS.append(f'sw-updated 기록 화면 검색창 확인 실패 {st}')
             browser.close()
 
-            # 8) 0.4.15 전용 세션에서 sw.js 내용이 바뀌면 자동 새로고침
+            # 8) 0.4.16 전용 세션에서 sw.js 내용이 바뀌면 자동 새로고침
             httpd.legacy = False
             httpd.sw_bump = False
             browser,ctx,page=launch(p,412,915)
@@ -457,19 +491,20 @@ def main():
                     page.wait_for_selector('nav#nav', timeout=20000)
                 ver3=page.evaluate('()=>typeof VERSION!=="undefined"?VERSION:null')
                 log('SW bump auto-reload VERSION', ver3)
-                if ver3!='0.4.15':
-                    FAILS.append(f'0.4.15 자동새로고침 후 버전 이상: {ver3}')
+                if ver3!='0.4.16':
+                    FAILS.append(f'0.4.16 자동새로고침 후 버전 이상: {ver3}')
                 else:
                     log('SW bump auto-reload OK')
             except Exception as e:
                 log('SW bump auto-nav', type(e).__name__, e)
-                log('WARN: 0.4.15 자동새로고침이 이 환경에서 확인되지 않음 (코드는 index.html controllerchange + sw navigate 유지)')
+                log('WARN: 0.4.16 자동새로고침이 이 환경에서 확인되지 않음 (코드는 index.html controllerchange + sw navigate 유지)')
             browser.close()
 
             # 9) 목표 체형 미리보기 0/50/100% (5단계 GLB, 반투명 겹침 없음)
             BODY0=Path('/workspace/다이어트게임-0.4.15-체형0.png')
             BODY50=Path('/workspace/다이어트게임-0.4.15-체형50.png')
             BODY100=Path('/workspace/다이어트게임-0.4.15-체형100.png')
+            BODY16={0:Path('/workspace/다이어트게임-0.4.16-체형0.png'),0.25:Path('/workspace/다이어트게임-0.4.16-체형25.png'),0.5:Path('/workspace/다이어트게임-0.4.16-체형50.png'),0.75:Path('/workspace/다이어트게임-0.4.16-체형75.png'),1:Path('/workspace/다이어트게임-0.4.16-체형100.png')}
             browser,ctx,page=launch(p,412,915)
             guest(page,url)
             page.locator('nav#nav button', has_text='내정보').click()
@@ -480,7 +515,7 @@ def main():
             except Exception as e:
                 FAILS.append(f'GLB 모프 준비 실패: {type(e).__name__} {e}')
             else:
-                for prog, dest in ((0, BODY0), (0.5, BODY50), (1, BODY100)):
+                for prog, dest in ((0, BODY0), (0.25, BODY16[0.25]), (0.5, BODY50), (0.75, BODY16[0.75]), (1, BODY100)):
                     page.evaluate(''' (p) => {
                       DGAvatar.setIdle(0);
                       DGAvatar.setRotation(0);
@@ -493,6 +528,8 @@ def main():
                     } ''')
                     log('morph', prog, overlap)
                     page.locator('#avatarSlot').screenshot(path=str(dest))
+                    if prog in BODY16:
+                        page.locator('#avatarSlot').screenshot(path=str(BODY16[prog]))
                     log('SHOT', dest)
             browser.close()
 
@@ -504,7 +541,8 @@ def main():
         for f in FAILS:
             log(' -', f)
         sys.exit(1)
-    extra=[Path('/workspace/다이어트게임-0.4.15-홈트.png'), Path('/workspace/다이어트게임-0.4.15-예상체중.png'), Path('/workspace/다이어트게임-0.4.15-저녁추천.png'), Path('/workspace/다이어트게임-0.4.15-체형0.png'), Path('/workspace/다이어트게임-0.4.15-체형50.png'), Path('/workspace/다이어트게임-0.4.15-체형100.png')]
+    extra=[Path('/workspace/다이어트게임-0.4.15-홈트.png'), Path('/workspace/다이어트게임-0.4.15-예상체중.png'), Path('/workspace/다이어트게임-0.4.15-저녁추천.png'), Path('/workspace/다이어트게임-0.4.15-체형0.png'), Path('/workspace/다이어트게임-0.4.15-체형50.png'), Path('/workspace/다이어트게임-0.4.15-체형100.png'),
+           Path('/workspace/다이어트게임-0.4.16-오늘먹은것.png'), Path('/workspace/다이어트게임-0.4.16-다음식사추천.png'), Path('/workspace/다이어트게임-0.4.16-내일식단레시피.png')]
     missing=[p for p in (FINAL_SHOT, HOME_SHOT, FRUIT_SHOT, CHICKEN_PIZZA_SHOT, *extra) if not p.exists()]
     if missing:
         log('E2E FAIL: 스크린샷 없음', *[str(p) for p in missing])

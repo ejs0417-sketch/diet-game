@@ -17,6 +17,7 @@
 <script src="supplements.js"></script>
 <script src="coach.js"></script>
 <script src="today-guide.js"></script>
+<script src="recipes.js"></script>
 <script src="home-workout.js"></script>
 <script src="delivery-foods.js"></script>
 <script src="food-search.js"></script>
@@ -26,7 +27,7 @@
 <script>if('serviceWorker' in navigator){
   const hadController=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadController)location.reload();});
-  navigator.serviceWorker.register('sw.js?v=0.4.15',{updateViaCache:'none'}).then(reg=>{
+  navigator.serviceWorker.register('sw.js?v=0.4.16',{updateViaCache:'none'}).then(reg=>{
     const ping=()=>reg.update();
     ping();
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)ping();});

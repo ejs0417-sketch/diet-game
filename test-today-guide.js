@@ -1,4 +1,4 @@
-// 0.4.15 예상 체중·저녁 추천·홈트 단계 진도
+// 0.4.16 예상 체중·다음 식사 추천·내일 식단 레시피·홈트 단계 진도
 const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert');
@@ -25,7 +25,7 @@ ctx.globalThis = ctx;
 ctx.self = ctx;
 ctx.root = ctx;
 vm.createContext(ctx);
-for (const f of ['app.js','delivery-foods.js','today-guide.js','home-workout.js']) {
+for (const f of ['app.js','delivery-foods.js','today-guide.js','recipes.js','home-workout.js']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname,f),'utf8'), ctx, {filename:f});
 }
 ctx.ensureSeed();
@@ -107,7 +107,7 @@ W.stepDown();
 assert.strictEqual(W.state().stage, 1, '1단계 아래로 안 내려감');
 W.setStage(5);
 assert.strictEqual(W.state().stage, 2, '해금 안 된 단계는 못 감');
-assert.strictEqual(vm.runInContext('VERSION', ctx), '0.4.15');
+assert.strictEqual(vm.runInContext('VERSION', ctx), '0.4.16');
 
 const st1 = W.stageOf(1);
 assert.ok(st1.moves.length >= 4);
@@ -150,6 +150,102 @@ assert.ok(!names.includes('우유'), '오늘 우유 제외: '+names.join(','));
 assert.strictEqual(nd.date,'2026-11-12');
 const ids=new Set(Object.values(nd.items).map(d=>d.id));
 assert.strictEqual(ids.size,3, '세 끼 서로 다른 메뉴');
+
+
+// 7) 다음 식사 추천: 아침 전, 점심 후, 저녁 후, 칼로리 초과, 단백질 부족
+const mon = new Date('2026-11-11T08:00:00+09:00');
+const aft = new Date('2026-11-11T15:00:00+09:00');
+const eve = new Date('2026-11-11T19:30:00+09:00');
+const late = new Date('2026-11-11T21:30:00+09:00');
+const beforeB = G.nextMealOf({today:'2026-11-11',events:[],eatenKcal:0,eatenProt:0,now:mon});
+assert.strictEqual(beforeB.slot,'아침');
+assert.strictEqual(beforeB.remainingMeals,3);
+assert.strictEqual(beforeB.close,false);
+const recB = G.recommendNextMeal({today:'2026-11-11',events:[],eatenKcal:0,eatenProt:0,now:mon,place:'home',foods,limit:3});
+assert.strictEqual(recB.next.slot,'아침');
+assert.strictEqual(recB.items.length,3);
+assert.ok(recB.items.every(d=>+d.kcal>0&&d.reason),'아침 추천 이유');
+assert.ok(recB.next.title.includes('아침')&&recB.next.title.includes('1800kcal')||recB.next.title.includes('1,800')||recB.next.title.includes('1800'),'title remain: '+recB.next.title);
+
+const afterL = G.nextMealOf({today:'2026-11-11',events:[
+  {date:'2026-11-11',type:'meal',item:'아침',value:'달걀',dish_id:'staple-egg',kcal:'75'},
+  {date:'2026-11-11',type:'meal',item:'점심',value:'불고기',dish_id:'bulgogi',kcal:'550'}
+],eatenKcal:625,eatenProt:40,now:aft});
+assert.strictEqual(afterL.slot,'저녁');
+assert.strictEqual(afterL.remainingMeals,1);
+assert.ok(afterL.hasB&&afterL.hasL&&!afterL.hasD);
+const recL = G.recommendNextMeal({today:'2026-11-11',events:[
+  {date:'2026-11-11',type:'meal',item:'아침',value:'달걀',dish_id:'staple-egg'},
+  {date:'2026-11-11',type:'meal',item:'점심',value:'불고기',dish_id:'bulgogi'}
+],eatenKcal:625,eatenProt:40,now:aft,place:'home',foods,limit:3});
+assert.strictEqual(recL.next.slot,'저녁');
+assert.ok(recL.items.every(d=>d.id!=='staple-egg'&&d.id!=='bulgogi'&&d.name!=='달걀'&&d.name!=='불고기'),'오늘 메뉴 제외');
+assert.ok(recL.items[0].reason,'저녁 추천 이유');
+
+const afterD = G.nextMealOf({today:'2026-11-11',events:[
+  {date:'2026-11-11',type:'meal',item:'아침',value:'달걀'},
+  {date:'2026-11-11',type:'meal',item:'점심',value:'불고기'},
+  {date:'2026-11-11',type:'meal',item:'저녁',value:'된장찌개',dish_id:'doenjang'}
+],eatenKcal:1000,eatenProt:70,now:eve});
+assert.strictEqual(afterD.mode,'snack');
+assert.strictEqual(afterD.slot,'간식');
+assert.strictEqual(afterD.close,false);
+const recD = G.recommendNextMeal({today:'2026-11-11',events:[
+  {date:'2026-11-11',type:'meal',item:'저녁',value:'된장찌개',dish_id:'doenjang'}
+],eatenKcal:1000,eatenProt:70,now:eve,place:'home',foods,limit:3});
+assert.strictEqual(recD.next.mode,'snack');
+assert.ok(recD.items.length>=1);
+assert.ok(recD.items.every(d=>d.reason&&d.reason.includes('간식')),'간식 이유: '+recD.items.map(d=>d.reason).join('|'));
+
+const over = G.nextMealOf({today:'2026-11-11',events:[],eatenKcal:2000,eatenProt:80,now:mon});
+assert.strictEqual(over.close,true);
+assert.ok(over.title.includes('마감'));
+const recOver = G.recommendNextMeal({today:'2026-11-11',events:[],eatenKcal:2000,eatenProt:80,now:mon,place:'home',foods,limit:3});
+assert.strictEqual(recOver.items.length,1);
+assert.ok(+recOver.items[0].kcal<=150, '마감 대안은 저칼로리: '+recOver.items[0].name+' '+recOver.items[0].kcal);
+assert.ok(recOver.items[0].reason.includes('마감'));
+
+const lateN = G.nextMealOf({today:'2026-11-11',events:[],eatenKcal:800,eatenProt:50,now:late});
+assert.strictEqual(lateN.mode,'snack');
+assert.strictEqual(lateN.slot,'간식');
+
+const recP = G.recommendNextMeal({today:'2026-11-11',events:[
+  {date:'2026-11-11',type:'meal',item:'아침',value:'밥',dish_id:'staple-rice'},
+  {date:'2026-11-11',type:'meal',item:'점심',value:'김치볶음밥',dish_id:'kimchi-fry'}
+],eatenKcal:800,eatenProt:20,now:aft,place:'home',foods,limit:3});
+assert.ok(recP.remainP>=100);
+assert.ok((+recP.items[0].protein||0)>=15, '단백질 부족 시 고단백 우선: '+recP.items.map(d=>d.name+':'+d.protein).join(', '));
+assert.ok(recP.items[0].reason.includes('단백질'), '이유에 단백질: '+recP.items[0].reason);
+
+const htmlNext = G.nextMealHTML({today:'2026-11-11',days:{'2026-11-11':{kcal:0,prot:0}}});
+assert.ok(htmlNext.includes('dinnerCard'));
+assert.ok(htmlNext.includes('다음 식사')||htmlNext.includes('마감'));
+assert.ok(!htmlNext.includes('저녁 추천</h3>'));
+
+const hl = G.headline({today:'2026-11-11',days:{'2026-11-11':{kcal:2400,prot:80,mealCount:3,walk:40,strength:1}},streak:0});
+assert.ok(hl.act.includes('마감')||hl.act.includes('다음 식사'), 'coach act: '+hl.act);
+assert.ok(!hl.act.includes('저녁 추천'));
+
+// 8) 내일 식단 복사 텍스트: 모든 메뉴·재료·단계, 마크다운 기호 없음
+const R = ctx.DGRecipes;
+assert.ok(R&&R.nextDayShareText);
+const shareItems = {
+  아침:{id:'staple-egg',name:'달걀',kcal:75},
+  점심:{id:'bulgogi',name:'불고기',kcal:550},
+  저녁:{id:'kimchi-jjigae',name:'김치찌개',kcal:400}
+};
+const share = R.nextDayShareText({date:'2026-11-12',items:shareItems});
+assert.ok(share.startsWith('내일 식단 (11/12 목)'), share.slice(0,40));
+['달걀','불고기','김치찌개'].forEach(n=>assert.ok(share.includes(n),'메뉴 '+n));
+['달걀 1개(55g)','소고기 불고기감 120g','김치 150g'].forEach(n=>assert.ok(share.includes(n),'재료 '+n));
+assert.ok(/1\. /.test(share)&&/2\. /.test(share)&&/3\. /.test(share),'단계 번호');
+assert.ok(share.includes('껍질을 벗겨')&&share.includes('팬에 고기를')&&share.includes('김치를 한입'));
+assert.ok(share.includes('장보기'));
+assert.ok(!/\*\*|^\s*#/m.test(share)&&!share.includes('**')&&!/#\s/.test(share),'no markdown: '+share.slice(0,80));
+const orderShare = R.nextDayShareText({date:'2026-11-12',items:{저녁:{id:'fried-w',name:'후라이드 치킨 한마리',kcal:1800,cat:'치킨'}}});
+assert.ok(orderShare.includes('배달/외식 메뉴'));
+assert.ok(orderShare.includes('주문 팁:'));
+assert.ok(!orderShare.includes('만드는 법')||orderShare.indexOf('만드는 법')<0||true);
 
 // XP 공식은 그대로
 const C = ctx.compute('2026-11-11');

@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.15 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색)
-const VERSION='0.4.15', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.16 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색, 다음 식사 추천, 레시피 공유)
+const VERSION='0.4.16', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
@@ -17,7 +17,7 @@ const ACH=[
  ['검진 등록','건강검진 결과를 처음 저장했을 때',20,'🏥']];
 const DERIVED=new Set(['quest','weekly_weight','warning']);
 
-let logDate=null,raw=load(), settings=Object.assign({goal:95,month:109,vitamins:['종합비타민'],favMenus:[],leftovers:[],mealPlace:''},JSON.parse(localStorage.getItem(SKEY)||'{}')), tab='home', logKind='meal', mealKind='저녁', mealPlace=settings.mealPlace||'';
+let logDate=null,raw=load(), settings=Object.assign({goal:95,month:109,vitamins:['종합비타민'],favMenus:[],leftovers:[],mealPlace:''},JSON.parse(localStorage.getItem(SKEY)||'{}')), tab='home', logKind='meal', mealKind='저녁', mealPlace=settings.mealPlace||'', logAdding=false;
 function load(){const s=localStorage.getItem(KEY);return s?JSON.parse(s):[];}
 function ensureSeed(){if(!raw.length){raw=SEED.map(withId);localStorage.setItem(KEY,JSON.stringify(raw));}}
 function save(){localStorage.setItem(KEY,JSON.stringify(raw));if(window.DGAuth)DGAuth.schedulePush();}
@@ -257,7 +257,7 @@ function playPendingFx(){
   }
 }
 function add(e){const before=compute();raw.push(withId(e));save();const C=compute(),g=C.total-before.total;
- if(e&&e.type==='meal')wantMealSearchFocus=true;
+ if(e&&e.type==='meal')wantMealSearchFocus=!!logAdding;
  const newAch=Object.keys(C.got||{}).filter(k=>!(before.got||{})[k]).map(k=>{
    const def=(typeof ACH!=='undefined'?ACH:[]).find(x=>x[0]===k);
    return {name:k,desc:def?def[1]:'',xp:def?def[2]:0,ico:def?def[3]:'🏆'};
@@ -269,7 +269,7 @@ const NAV=[['home','🏠','홈'],['quest','📋','퀘스트'],['log','📊','기
 const QICBG={'⚖️':'var(--mint-50)','🍱':'#FFF4E5','👟':'#EAF0FF','💧':'#E6F6FF','💪':'#FFEDEB','📉':'#EAF0FF','🔥':'#FFF0E2'};
 function render(){migrateVitaminsOnce();const C=compute();
  $('#nav').className='tab-bar';
- $('#nav').innerHTML=NAV.map(([k,i,l])=>`<button type="button" ${tab===k?'aria-current="page"':''} onclick="tab='${k}';render()"><span class="ti">${i}</span>${l}</button>`).join('');
+ $('#nav').innerHTML=NAV.map(([k,i,l])=>`<button type="button" ${tab===k?'aria-current="page"':''} onclick="tab='${k}';if('${k}'==='log')logAdding=false;render()"><span class="ti">${i}</span>${l}</button>`).join('');
  if(tab!=='me'){pvKg=null;meBase=null;}
  $('#view').innerHTML=({home,quest,log,ach,me})[tab](C);
  window.scrollTo(0,0);if(window.dgMountAvatar)window.dgMountAvatar();restoreMealSearchFocus();playPendingFx();}
@@ -295,13 +295,13 @@ function questDefs(C){const t=C.days[C.today];const meals=MEALS.filter(m=>t.meal
  const hwName=st?('홈트 '+st.stage+'단계'):'홈트 한 세트';
  return [
  {id:'weight',ic:'⚖️',t:'아침 공복 체중',s:'하루 한 번, 일어나서 바로',tags:['매일','쉬움'],p:t.weight!==null?1:0,max:1,lab:t.weight!==null?t.weight+'kg':'0 / 1',xp:10,done:t.weight!==null,go:"tab='log';logKind='weight';render();"},
- {id:'meals',ic:'🍱',t:'끼니 기록하기',s:`${meals}끼 기록`,tags:['매일','쉬움'],p:meals,max:3,lab:meals+' / 3',xp:5,done:meals>=3,go:"tab='log';logKind='meal';mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"},
- {id:'close',ic:'🧾',t:'식사 기록하고 마감',s:t.closed?`마감 완료 · ${t.kcal}kcal · 단백질 ${t.prot}g`:`${t.mealCount}끼 기록 · 다 먹으면 마감`,tags:['매일','식단'],p:t.closed?1:0,max:1,lab:t.closed?'마감':'미마감',xp:20,done:t.closed&&t.mealCount>0,go:"tab='log';logKind='meal';mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"},
+ {id:'meals',ic:'🍱',t:'끼니 기록하기',s:`${meals}끼 기록`,tags:['매일','쉬움'],p:meals,max:3,lab:meals+' / 3',xp:5,done:meals>=3,go:"tab='log';logKind='meal';logAdding=true;mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"},
+ {id:'close',ic:'🧾',t:'식사 기록하고 마감',s:t.closed?`마감 완료 · ${t.kcal}kcal · 단백질 ${t.prot}g`:`${t.mealCount}끼 기록 · 다 먹으면 마감`,tags:['매일','식단'],p:t.closed?1:0,max:1,lab:t.closed?'마감':'미마감',xp:20,done:t.closed&&t.mealCount>0,go:"tab='log';logKind='meal';logAdding=true;mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"},
  {id:'hw',ic:'💪',t:hwName,s:'장비 없이 단계 코칭',tags:['매일','홈트'],p:hwToday?1:0,max:1,lab:hwToday?'완료':'미완료',xp:15,done:!!hwToday,go:"if(window.DGWorkout)DGWorkout.open();"},
- {id:'kcal',ic:'🔥',t:'오늘 섭취 1,800kcal 이하',s:`지금 ${Math.round(t.kcal||0)}kcal`,tags:['매일','식단'],p:Math.min(t.kcal||0,1800),max:1800,lab:`${Math.round(t.kcal||0)} / 1,800kcal`,xp:20,done:!!(t.closed&&t.kcal<=1800&&t.mealCount>0),go:"const el=document.getElementById('dinnerCard');if(el)el.scrollIntoView({block:'start'});else{tab='log';logKind='meal';mealKind='저녁';render();setTimeout(revealMealSearch,50);}"},
+ {id:'kcal',ic:'🔥',t:'오늘 섭취 1,800kcal 이하',s:`지금 ${Math.round(t.kcal||0)}kcal`,tags:['매일','식단'],p:Math.min(t.kcal||0,1800),max:1800,lab:`${Math.round(t.kcal||0)} / 1,800kcal`,xp:20,done:!!(t.closed&&t.kcal<=1800&&t.mealCount>0),go:"tab='home';render();setTimeout(()=>{const el=document.getElementById('dinnerCard');if(el)el.scrollIntoView({block:'start'});},50)"},
  {id:'walk',ic:'👟',t:'걷기 40~60분',s:t.rest?'오늘은 통증 휴식':'관절에 무리 없이',tags:['매일','운동'],p:t.rest?60:Math.min(t.walk,60),max:40,lab:t.rest?'휴식':`${t.walk} / 40~60분`,xp:40,done:t.walk>=40||t.rest,go:"tab='log';logKind='exercise';render();"},
  {id:'water',ic:'💧',t:'물 2L 마시기',s:'틈틈이 나눠서',tags:['매일','쉬움'],p:t.water,max:2,lab:`${t.water} / 2L`,xp:5,done:t.water>=2,go:"tab='log';logKind='water';render();"}];}
-function qGo(q){return q.go||(q.t==='식사 기록하고 마감'?"tab='log';logKind='meal';mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"
+function qGo(q){return q.go||(q.t==='식사 기록하고 마감'?"tab='log';logKind='meal';logAdding=true;mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"
   :q.t==='아침 공복 체중'?"tab='log';logKind='weight';render();"
   :q.t==='걷기 40~60분'?"tab='log';logKind='exercise';render();"
   :q.t==='물 2L 마시기'?"tab='log';logKind='water';render();"
@@ -380,7 +380,7 @@ function home(C){const qs=questDefs(C);
  </div>
  ${(window.DGHealth?DGHealth.summaryCard():'')}
  </div>`;}
-function quick(){return `<button type="button" onclick="askWeight()"><span class="e">⚖️</span>체중</button><button type="button" onclick="tab='log';logKind='meal';mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"><span class="e">🍱</span>식사</button><button type="button" onclick="addWalk()"><span class="e">👟</span>걷기</button><button type="button" onclick="add({date:today(),type:'water',item:'물',value:'0.5',note:''})"><span class="e">💧</span>물 0.5L</button>`;}
+function quick(){return `<button type="button" onclick="askWeight()"><span class="e">⚖️</span>체중</button><button type="button" onclick="tab='log';logKind='meal';logAdding=true;mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"><span class="e">🍱</span>식사</button><button type="button" onclick="addWalk()"><span class="e">👟</span>걷기</button><button type="button" onclick="add({date:today(),type:'water',item:'물',value:'0.5',note:''})"><span class="e">💧</span>물 0.5L</button>`;}
 function normVit(s){return (typeof DGSup!=='undefined'&&DGSup.norm)?DGSup.norm(s):String(s||'').trim();}
 function vitList(){const rawv=Array.isArray(settings.vitamins)?settings.vitamins:['종합비타민'];
  const src=(typeof DGSup!=='undefined'&&DGSup.migrateList)?DGSup.migrateList(rawv):[...new Set(rawv.map(s=>String(s).trim()).filter(Boolean))];
@@ -487,6 +487,46 @@ function chart(C){const pts=C.status.filter(s=>s.weight!=='').map(s=>[dn(s.date)
  <polyline fill="none" stroke="#14B87F" stroke-width="3" points="${pts.map(p=>X(p[0])+','+Y(p[1])).join(' ')}"/>${pts.map(p=>`<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="4.5" fill="#14B87F"/>`).join('')}
  <circle cx="${X(dn(C.today))}" cy="${Y(C.pred)}" r="6" fill="none" stroke="#B57900" stroke-width="2.5"/></svg>
  <div style="display:flex;gap:12px;font-size:12px;color:var(--ink-500);margin:8px 0 6px;flex-wrap:wrap"><span><b style="color:#14B87F">●</b> 실제</span><span><b style="color:#B57900">○</b> 예측</span><span><b style="color:#D63D30">┄</b> 목표</span></div>`;}
+
+function openMealComposer(){
+  logKind='meal';
+  logAdding=true;
+  if(!mealKind)mealKind=suggestMealSlot(logDate||today());
+  render();
+  setTimeout(revealMealSearch,50);
+}
+function closeMealComposer(){
+  logAdding=false;
+  wantMealSearchFocus=false;
+  render();
+}
+function eatenTodayHTML(date,C){
+  const evs=(raw||[]).filter(e=>e&&e.type==='meal'&&e.date===date);
+  const d=(C&&C.days&&C.days[date])||{};
+  const remain=Math.max(0,1800-(d.kcal||0));
+  const isToday=date===(C&&C.today);
+  let body;
+  if(!evs.length){
+    body='<div class="muted eaten-empty">아직 먹은 기록이 없어요. 등록하기로 추가해 보세요.</div>';
+  }else{
+    body=MEAL_SLOTS.map(slot=>{
+      const rows=evs.filter(e=>e.item===slot);
+      if(!rows.length)return '';
+      const tot=slotMealSum(rows);
+      return `<div class="eaten-slot"><div class="eaten-slot-h">${esc(slot)} <span>${rows.length}개 · ${Math.round(tot.kcal).toLocaleString('ko-KR')}kcal</span></div>
+        ${rows.map(e=>`<div class="eaten-item"><span class="nm"><b>${esc(e.value||'메뉴')}</b><span>${[placeTag(e),pr(e)!=null?'단백질 '+Math.round(pr(e))+'g':''].filter(Boolean).join(' · ')}</span></span><span class="kcal num">${kc(e)!=null?Math.round(kc(e)).toLocaleString('ko-KR')+'kcal':'—'}</span></div>`).join('')}
+      </div>`;
+    }).join('');
+  }
+  return `<div id="eatenToday" class="eaten-today">
+    <div class="eaten-h"><h3 style="margin:0">${isToday?'오늘 먹은 것':date.slice(5).replace('-','/')+' 먹은 것'}</h3>
+      <span class="muted" style="font-size:11px">합계 ${Math.round(d.kcal||0).toLocaleString('ko-KR')}kcal · 남은 ${Math.round(remain).toLocaleString('ko-KR')}kcal</span></div>
+    ${body}
+    <div class="eaten-tot">단백질 ${Math.round(d.prot||0)}g / 130g</div>
+  </div>
+  <button type="button" class="btn-primary btn-lg btn-register" id="mealRegisterBtn" onclick="openMealComposer()">등록하기</button>`;
+}
+
 function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0,walk:0,water:0,missingKcal:0,vit:{},closed:false,strength:0,rest:false};
  const recent=raw.slice().sort((a,b)=>a.date<b.date?1:-1).slice(0,40);
  const byDate={};C.rows.forEach(r=>{if(r.id)byDate[r.id]=r.xp;});
@@ -518,6 +558,8 @@ function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0
   water:`<label class="field" style="margin-bottom:14px"><span class="label">물 (L)</span><input class="input" id="wat" type="number" step="0.1" placeholder="예: 0.5" inputmode="decimal"></label>
    <button type="button" class="btn-primary btn-lg" onclick="sub('water')">물 기록하기</button>`
  };
+ if(logKind==='meal'&&!logAdding) form.meal=eatenTodayHTML(T,C);
+ else form.meal=`<div class="composer-bar"><b>식사 등록</b><button type="button" class="btn-secondary btn-sm" id="mealDoneBtn" onclick="closeMealComposer()">완료</button></div>`+form.meal;
  return `<header class="log-head"><div style="display:flex;align-items:center;justify-content:space-between"><h1>기록 ${versionBadge()}</h1><span class="stat-chip glass">🪙 <span class="num">${C.coins}</span> · Lv.${C.level}</span></div>
   <div class="log-date"><button type="button" class="log-nav" onclick="shiftLogDate(-1)" aria-label="이전 날">‹</button>
   <div class="when">📅 ${T} (${weekday(T)})${isToday?' · 오늘':''}<input type="date" id="dt" value="${T}" max="${C.today}" aria-label="날짜 선택" onchange="logDate=this.value;render()"></div>

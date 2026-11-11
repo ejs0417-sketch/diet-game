@@ -1,8 +1,8 @@
-// 다이어트 게임 0.4.15 — 오늘 예상 체중, 저녁 추천, 코치 한마디 (규칙 기반, 추정치)
+// 다이어트 게임 0.4.16 — 오늘 예상 체중, 다음 식사 추천, 내일 식단 레시피·공유, 코치 한마디 (규칙 기반, 추정치)
 (function(root){
 const KCAL_PER_KG=7700;
 const ACT_OPTS=[[1.2,'거의 앉아서'],[1.375,'조금 활동'],[1.55,'보통'],[1.725,'활동적'],[1.9,'매우 활동적']];
-const BUDGET=1800, PROT_GOAL=130;
+const BUDGET=1800, PROT_GOAL=130, LOW_KCAL=150;
 
 function clamp(n,a,b){return Math.max(a,Math.min(b,n));}
 function ageFromBirth(birth,d){
@@ -179,7 +179,7 @@ function recScore(dish,opt){
   const k=+dish.kcal||0, p=+dish.protein||0;
   if(!(k>0))return -1e9;
   const remainK=opt.remainK, remainP=opt.remainP, place=opt.place||'';
-  const cap=remainK>0?remainK:BUDGET;
+  const cap=opt.targetK>0?opt.targetK:(remainK>0?remainK:BUDGET);
   let s=0;
   if(k>cap*1.15)s-=(k-cap)*0.08;
   else if(k>=cap*0.45&&k<=cap*1.05)s+=40;
@@ -219,27 +219,126 @@ function recommendDinner(opt){
   }
   return {items:out,remainK,remainP};
 }
-function dinnerHTML(C){
+function seoulHM(now){
+  now=now||new Date();
+  const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'Asia/Seoul',hour:'2-digit',minute:'2-digit',hour12:false,hourCycle:'h23'}).formatToParts(now);
+  const h=+(parts.find(x=>x.type==='hour')||{}).value||0;
+  const m=+(parts.find(x=>x.type==='minute')||{}).value||0;
+  return {h,m,min:h*60+m};
+}
+function nextMealOf(opt){
+  opt=opt||{};
+  const date=opt.date||opt.today||'';
+  const evs=opt.events||(typeof raw!=='undefined'?raw:[]);
+  const slots=new Set(evs.filter(e=>e&&e.type==='meal'&&(!date||e.date===date)).map(e=>e.item));
+  const hasB=slots.has('아침')||slots.has('아점');
+  const hasL=slots.has('점심')||slots.has('점저');
+  const hasD=slots.has('저녁');
+  const budget=opt.budget||BUDGET;
+  const eatenK=opt.eatenKcal!=null?+opt.eatenKcal:0;
+  const remainK=Math.max(0,budget-eatenK);
+  const remainP=Math.max(0,(opt.protGoal||PROT_GOAL)-(+opt.eatenProt||0));
+  const hm=seoulHM(opt.now);
+  const after21=hm.h>=21;
+  let slot=null, remainingMeals=0, mode='meal', close=false;
+  if(remainK<=LOW_KCAL){close=true;mode='close';remainingMeals=0;slot=null;}
+  else if(after21||hasD){mode='snack';slot='간식';remainingMeals=1;}
+  else if(!hasB){slot='아침';remainingMeals=3;}
+  else if(!hasL){slot='점심';remainingMeals=2;}
+  else {slot='저녁';remainingMeals=1;}
+  const title=close?('오늘은 여기서 마감 · 남은 '+Math.round(remainK)+'kcal')
+    :(mode==='snack'?('다음 식사: 간식 추천 · 남은 '+Math.round(remainK)+'kcal')
+    :('다음 식사: '+slot+' 추천 · 남은 '+Math.round(remainK)+'kcal'));
+  return {slot,remainingMeals,mode,close,remainK,remainP,after21,hasB,hasL,hasD,title,budget};
+}
+function recReason(dish,nxt,remainK,remainP){
+  const kcal=Math.round(+dish.kcal||0);
+  if(nxt&&nxt.close)return '오늘은 여기서 마감, '+kcal+'kcal';
+  if(nxt&&nxt.mode==='snack')return '가벼운 간식, '+kcal+'kcal';
+  if(remainP>20&&(+dish.protein||0)>=15)return '남은 단백질 '+Math.round(remainP)+'g 채우기, '+kcal+'kcal';
+  return (nxt&&nxt.slot?nxt.slot+'에 맞게, ': '남은 '+Math.round(remainK)+'kcal 중 ')+kcal+'kcal';
+}
+function recommendNextMeal(opt){
+  opt=opt||{};
+  const list=(opt.foods||((root.DGFoods&&DGFoods.FOODS)||[])).slice();
+  const date=opt.date||opt.today||'';
+  const evs=opt.events||[];
+  const nxt=nextMealOf(opt);
+  const place=opt.place||'';
+  const keys=eatenMealKeys({day:date,events:evs,extra:opt.exclude});
+  const fn=root.DGFoods&&DGFoods.nutritionForPlace;
+  const remainK=nxt.remainK, remainP=nxt.remainP;
+  let targetK=nxt.remainingMeals>0?(remainK/nxt.remainingMeals):0;
+  if(nxt.mode==='snack')targetK=Math.min(remainK,300);
+  const ctx={remainK,remainP,place,targetK,evening:nxt.slot==='저녁',snack:nxt.mode==='snack'};
+  const asDish=d=>fn?fn(d,place):d;
+  if(nxt.close){
+    const lows=list.map(asDish).filter(d=>+d.kcal>0&&+d.kcal<=LOW_KCAL&&!dishExcluded(d,keys));
+    lows.sort((a,b)=>{
+      if(remainP>20){const dp=(+b.protein||0)-(+a.protein||0);if(dp)return dp;}
+      return (+a.kcal||0)-(+b.kcal||0);
+    });
+    let pick=lows[0];
+    if(!pick){
+      const any=list.map(asDish).filter(d=>+d.kcal>0&&!dishExcluded(d,keys)).sort((a,b)=>(+a.kcal||0)-(+b.kcal||0));
+      pick=any[0];
+    }
+    const items=pick?[Object.assign({},pick,{reason:recReason(pick,nxt,remainK,remainP)})]:[];
+    return {items,remainK,remainP,next:nxt,targetK:0};
+  }
+  const scored=list.map(d=>{
+    const dish=asDish(d);
+    if(dishExcluded(dish,keys)||!(+dish.kcal>0))return null;
+    let s=recScore(dish,ctx);
+    if(nxt.slot&&nxt.slot!=='간식')s=slotScore(dish,nxt.slot,ctx);
+    if(nxt.mode==='snack'&&+dish.kcal<=300)s+=16;
+    if(nxt.mode==='snack'&&+dish.kcal>450)s-=20;
+    return {dish,score:s};
+  }).filter(Boolean);
+  scored.sort((a,b)=>b.score-a.score);
+  if(remainP>20){
+    scored.sort((a,b)=>{
+      const ap=(+a.dish.protein||0)>=15, bp=(+b.dish.protein||0)>=15;
+      if(ap!==bp)return bp?1:-1;
+      return b.score-a.score;
+    });
+  }
+  const out=[], seen=new Set();
+  for(const x of scored){
+    const key=(x.dish.name||'').replace(/\s+/g,'').slice(0,8);
+    if(seen.has(x.dish.id)||seen.has(key))continue;
+    seen.add(x.dish.id);seen.add(key);
+    out.push(Object.assign({},x.dish,{reason:recReason(x.dish,nxt,remainK,remainP)}));
+    if(out.length>=(opt.limit||3))break;
+  }
+  return {items:out,remainK,remainP,next:nxt,targetK};
+}
+function nextMealHTML(C){
   const t=(C&&C.days&&C.days[C.today])||{};
   const place=(typeof mealPlace!=='undefined'?mealPlace:'')||'';
-  const rec=recommendDinner({eatenKcal:t.kcal||0,eatenProt:t.prot||0,place});
-  const items=rec.items||[];
-  if(!items.length)return '';
+  const evs=(typeof raw!=='undefined'?raw:[]);
+  const rec=recommendNextMeal({today:C&&C.today,events:evs,eatenKcal:t.kcal||0,eatenProt:t.prot||0,place});
+  const items=rec.items||[], nxt=rec.next||{};
+  if(!items.length&&!nxt.close)return '';
   const rows=items.map(f=>{
     const id=String(f.id||'').replace(/'/g,"\\'");
     const sub=[f.brand,f.cat,f.unit].filter(Boolean).join(' · ');
     const kcal=Math.round(+f.kcal||0).toLocaleString('ko-KR');
     const prot=f.protein!=null?` · 단백질 ${Math.round(f.protein)}g`:'';
+    const why=f.reason?`<span class="rec-why">${esc(f.reason)}</span>`:'';
     return `<button type="button" class="meal-search-item rec-item" onclick="DGGuide.addDinner('${id}')">
-      <span class="nm"><b>${esc(f.name)}</b><span>${esc(sub)}${prot}</span></span>
+      <span class="nm"><b>${esc(f.name)}</b><span>${esc(sub)}${prot}</span>${why}</span>
       <span class="kcal"><span class="num">${kcal}</span>kcal</span></button>`;
   }).join('');
+  const hint=nxt.close?'오늘은 여기서 마감하는 게 좋아요. 가볍게 하나만 남겨 두었어요.'
+    :`오늘 기록과 ${place?esc((typeof placeMeta==='function'&&(placeMeta(place)||[])[2])||'선택'):'식사 방식'}을 반영했어요. 누르면 ${esc(nxt.slot||'다음 끼니')}에 담겨요.`;
   return `<div class="card guide-card" id="dinnerCard">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 style="margin:0">저녁 추천</h3><span class="muted" style="font-size:11px">남은 ${Math.round(rec.remainK)}kcal · 단백질 ${Math.round(rec.remainP)}g</span></div>
-    <div class="muted" style="font-size:12px;margin-bottom:6px">오늘 기록과 ${place?esc((typeof placeMeta==='function'&&(placeMeta(place)||[])[2])||'선택'):'식사 방식'}을 반영했어요. 누르면 저녁 바구니에 담겨요.</div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px"><h3 style="margin:0">${esc(nxt.title||'다음 식사 추천')}</h3><span class="muted" style="font-size:11px;flex:none">단백질 ${Math.round(rec.remainP)}g 남음</span></div>
+    <div class="muted" style="font-size:12px;margin-bottom:6px">${hint}</div>
     <div class="rec-list">${rows}</div>
   </div>`;
 }
+function dinnerHTML(C){return nextMealHTML(C);}
 function addDinner(id){
   const foods=(root.DGFoods&&DGFoods.FOODS)||[];
   const rawDish=foods.find(f=>String(f.id)===String(id));
@@ -247,10 +346,14 @@ function addDinner(id){
   const fn=root.DGFoods&&DGFoods.nutritionForPlace;
   const place=(typeof mealPlace!=='undefined'?mealPlace:'')||'';
   const f=fn?fn(rawDish,place):rawDish;
-  if(typeof mealKind!=='undefined')mealKind='저녁';
+  const t=(typeof compute==='function'?(compute().days[compute().today]||{}):{})||{};
+  const evs=(typeof raw!=='undefined'?raw:[]);
+  const day=typeof today==='function'?today():'';
+  const nxt=nextMealOf({today:day,events:evs,eatenKcal:t.kcal||0,eatenProt:t.prot||0});
+  const slot=nxt.slot||'간식';
+  if(typeof mealKind!=='undefined')mealKind=slot;
   if(typeof logKind!=='undefined')logKind='meal';
-  if(typeof tab!=='undefined')tab='log';
-  const ev={date:typeof today==='function'?today():'',type:'meal',item:'저녁',value:f.name,kcal:f.kcal!=null?String(Math.round(+f.kcal)): '',protein_g:f.protein!=null?String(f.protein):'',kcal_source:f.id?'음식표(대략)':'',dish_id:f.id||'',note:place?('방식='+(((typeof placeMeta==='function'?placeMeta(place):null)||[])[2]||place)):''};
+  const ev={date:day,type:'meal',item:slot,value:f.name,kcal:f.kcal!=null?String(Math.round(+f.kcal)):'',protein_g:f.protein!=null?String(f.protein):'',kcal_source:f.id?'음식표(대략)':'',dish_id:f.id||'',note:place?('방식='+(((typeof placeMeta==='function'?placeMeta(place):null)||[])[2]||place)):''};
   if(place)ev.place=place;
   if(f.carbs!=null&&f.carbs!=='')ev.carbs_g=String(f.carbs);
   if(f.fat!=null&&f.fat!=='')ev.fat_g=String(f.fat);
@@ -380,11 +483,42 @@ function addNextMeal(slot,C){
   if(f.fat!=null&&f.fat!=='')ev.fat_g=String(f.fat);
   if(typeof add==='function')add(ev);
 }
+function nextDayItems(C,opt){
+  opt=opt||{};
+  const evs=opt.events||(typeof raw!=='undefined'?raw:[]);
+  const plan=loadNextPlan(C,{events:evs});
+  const items={};
+  ['아침','점심','저녁'].forEach(slot=>{
+    const f=dishById(plan&&plan.ids&&plan.ids[slot]);
+    if(f)items[slot]=f;
+  });
+  return {plan,items};
+}
+function nextDaySharePayload(C){
+  const {plan,items}=nextDayItems(C);
+  const R=root.DGRecipes;
+  const text=R&&R.nextDayShareText?R.nextDayShareText({date:plan&&plan.date,items,slots:['아침','점심','저녁']}):'';
+  const wd=R&&R.weekday&&plan&&plan.date?R.weekday(plan.date):'';
+  const md=R&&R.md&&plan&&plan.date?R.md(plan.date):(plan&&plan.date||'');
+  const title='내일 식단 ('+md+(wd?' '+wd:'')+')';
+  return {text,title,plan,items};
+}
+function copyNextDay(){
+  const C=typeof compute==='function'?compute():{};
+  const p=nextDaySharePayload(C);
+  if(root.DGRecipes&&DGRecipes.copyText)return DGRecipes.copyText(p.text);
+}
+function shareNextDay(){
+  const C=typeof compute==='function'?compute():{};
+  const p=nextDaySharePayload(C);
+  if(root.DGRecipes&&DGRecipes.shareText)return DGRecipes.shareText(p.text,p.title);
+}
 function nextDayHTML(C){
   const evs=(typeof raw!=='undefined'?raw:[]);
   const plan=loadNextPlan(C,{events:evs});
   if(!plan||!plan.date)return '';
   const recorded=new Set(evs.filter(e=>e&&e.type==='meal'&&e.date===plan.date).map(e=>e.item));
+  const R=root.DGRecipes;
   const rows=['아침','점심','저녁'].map(slot=>{
     const f=dishById(plan.ids[slot]);
     if(!f)return '';
@@ -395,13 +529,20 @@ function nextDayHTML(C){
     const btns=done?`<span class="muted" style="font-size:11px">기록됨</span>`:
       `<button type="button" class="btn-secondary btn-sm" onclick="DGGuide.swapNextMeal('${slot}')">교체</button>
        <button type="button" class="btn-primary btn-sm" onclick="DGGuide.addNextMeal('${slot}')">기록</button>`;
+    const recipe=R&&R.recipeHTML?R.recipeHTML(f):'';
     return `<div class="np-row">
       <div class="nm"><b>${esc(slot)} · ${esc(f.name)}</b><span>${esc(sub)}${prot} · <span class="num">${kcal}</span>kcal</span></div>
-      <div class="np-act">${btns}</div></div>`;
+      <div class="np-act">${btns}</div>
+      ${recipe}</div>`;
   }).join('');
+  const shareBtn=(R&&R.hasShare&&R.hasShare())?`<button type="button" class="btn-secondary btn-sm" onclick="DGGuide.shareNextDay()">공유</button>`:'';
   return `<div class="card guide-card" id="nextDayCard">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 style="margin:0">내일 식단</h3><span class="muted" style="font-size:11px">${esc(plan.date)}</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:8px"><h3 style="margin:0">내일 식단</h3><span class="muted" style="font-size:11px">${esc(plan.date)}</span></div>
     <div class="muted" style="font-size:12px;margin-bottom:8px">오늘 먹은 메뉴는 빼고 골랐어요. 교체하거나 내일 날짜로 바로 기록할 수 있어요.</div>
+    <div class="np-share" style="display:flex;gap:8px;margin-bottom:10px">
+      <button type="button" class="btn-primary btn-sm" onclick="DGGuide.copyNextDay()">복사하기</button>
+      ${shareBtn}
+    </div>
     <div class="np-list">${rows}</div>
   </div>`;
 }
@@ -410,12 +551,17 @@ function headline(C){
   const t=(C&&C.days&&C.days[C.today])||{};
   const kcal=t.kcal||0, prot=t.prot||0, meals=t.mealCount||0, streak=C&&C.streak||0;
   const walk=t.walk||0, str=t.strength||t.strMin, rest=!!t.rest;
-  if(kcal>=2300)return {id:'overeat',text:'오늘은 이미 '+Math.round(kcal).toLocaleString('ko-KR')+'kcal예요. 저녁만 가볍게 가 볼까요?',act:'저녁 추천 보기',go:"const el=document.getElementById('dinnerCard');if(el)el.scrollIntoView({block:'start'});"};
-  if(kcal>=2000&&meals>0)return {id:'overeat-soft',text:'칼로리가 목표보다 조금 많아요. 다음 한 끼만 가볍게 챙겨 봐요.',act:'저녁 추천 보기',go:"const el=document.getElementById('dinnerCard');if(el)el.scrollIntoView({block:'start'});"};
-  if(meals>0&&prot<100)return {id:'prot',text:'단백질이 아직 '+Math.round(prot)+'g이에요. 저녁에 한 끼만 채워도 균형이 맞아요.',act:'저녁 추천 보기',go:"const el=document.getElementById('dinnerCard');if(el)el.scrollIntoView({block:'start'});"};
+  const evs=(typeof raw!=='undefined'?raw:[]);
+  const nxt=nextMealOf({today:C&&C.today,events:evs,eatenKcal:kcal,eatenProt:prot});
+  const seeRec="const el=document.getElementById('dinnerCard');if(el)el.scrollIntoView({block:'start'});";
+  const openLog="tab='log';logKind='meal';logAdding=true;mealKind=(window.DGGuide&&DGGuide.nextMealOf)?(DGGuide.nextMealOf({today:today(),events:raw,eatenKcal:(compute().days[today()]||{}).kcal||0}).slot||suggestMealSlot()):suggestMealSlot();render();setTimeout(revealMealSearch,50);";
+  const act=nxt.close?'오늘은 여기서 마감 보기':'다음 식사 추천 보기';
+  if(kcal>=2300)return {id:'overeat',text:'오늘은 이미 '+Math.round(kcal).toLocaleString('ko-KR')+'kcal예요. '+(nxt.close?'여기서 마감하는 게 좋아요.':'다음 식사는 가볍게 가 볼까요?'),act,go:seeRec};
+  if(kcal>=2000&&meals>0)return {id:'overeat-soft',text:'칼로리가 목표보다 조금 많아요. '+(nxt.close?'오늘은 여기서 마감해 보세요.':'다음 한 끼만 가볍게 챙겨 봐요.'),act,go:seeRec};
+  if(meals>0&&prot<100)return {id:'prot',text:'단백질이 아직 '+Math.round(prot)+'g이에요. 다음 식사에서 한 끼만 채워도 균형이 맞아요.',act:'다음 식사 추천 보기',go:seeRec};
   if(!rest&&walk<40&&!str)return {id:'ex',text:'오늘은 아직 운동 기록이 없어요. 홈트 한 세트만 해도 몸이 가벼워져요.',act:'홈트 시작',go:"if(window.DGWorkout)DGWorkout.open();"};
   if(streak>=3&&(t.weight!=null||meals>0))return {id:'streak',text:'연속 '+streak+'일 기록 중이에요. 이 페이스 정말 좋아요.',act:'오늘 체중 기록',go:"tab='log';logKind='weight';render();"};
-  if(!meals)return {id:'meal',text:'끼니를 적으면 예상 체중과 저녁 추천이 더 정확해져요. 천천히 시작해도 돼요.',act:'식사 기록',go:"tab='log';logKind='meal';mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50);"};
+  if(!meals)return {id:'meal',text:'끼니를 적으면 예상 체중과 다음 식사 추천이 더 정확해져요. 천천히 시작해도 돼요.',act:'식사 기록',go:openLog};
   return {id:'ok',text:'오늘도 잘 적고 있어요. 남은 하루도 무리하지 말고 가볍게 가요.',act:'홈트 살펴보기',go:"if(window.DGWorkout)DGWorkout.open();"};
 }
 function coachHTML(C){
@@ -429,8 +575,8 @@ function coachHTML(C){
 }
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
-const api={KCAL_PER_KG,ACT_OPTS,ageFromBirth,mifflinBmr,tdeeProfile,forecastWeight,fmtKgDelta,walkExtraKg,forecastTrail,forecastChartSVG,forecastHTML,
-  recommendDinner,recScore,dinnerHTML,addDinner,recommendNextDay,eatenMealKeys,nextDayHTML,swapNextMeal,addNextMeal,loadNextPlan,headline,coachHTML};
+const api={KCAL_PER_KG,ACT_OPTS,LOW_KCAL,ageFromBirth,mifflinBmr,tdeeProfile,forecastWeight,fmtKgDelta,walkExtraKg,forecastTrail,forecastChartSVG,forecastHTML,
+  recommendDinner,recScore,dinnerHTML,nextMealHTML,addDinner,nextMealOf,recommendNextMeal,recommendNextDay,eatenMealKeys,nextDayHTML,swapNextMeal,addNextMeal,loadNextPlan,copyNextDay,shareNextDay,nextDaySharePayload,headline,coachHTML};
 root.DGGuide=api;
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
 })(typeof window!=='undefined'?window:globalThis);
