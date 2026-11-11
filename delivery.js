@@ -671,10 +671,20 @@ function commitMeals(){
   }
   const n=evs.length,k=evs.reduce((s,e)=>s+(+e.kcal||0),0),p=evs.reduce((s,e)=>s+(+e.protein_g||0),0);
   const leftN=activeLeftovers(date).length;
-  const kind=(draft&&draft.source==='search')?'메뉴':'배달';
+  const fromSearch=draft&&draft.source==='search';
+  const kind=fromSearch?'메뉴':'배달';
   draft=null;const el=$('#delivPane');if(el)el.remove();
   if(typeof toast==='function')toast(`${slot}에 ${kind} ${n}개 기록 · ${k}kcal · 단백질 ${Math.round(p)}g`+(leftN?` · 남은 음식 있음`:''));
-  if(typeof render==='function'){if(typeof tab!=='undefined')tab='home';render();}
+  if(typeof render==='function'){
+    if(fromSearch){
+      if(typeof tab!=='undefined')tab='log';
+      if(typeof logKind!=='undefined')logKind='meal';
+      if(typeof mealKind!=='undefined')mealKind=slot;
+      if(typeof logDate!=='undefined'&&date)logDate=date;
+      if(typeof wantMealSearchFocus!=='undefined')wantMealSearchFocus=true;
+    }else if(typeof tab!=='undefined')tab='home';
+    render();
+  }
 }
 
 function logFavorite(name){

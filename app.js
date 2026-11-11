@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.10 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색)
-const VERSION='0.4.10', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.11 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색)
+const VERSION='0.4.11', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
@@ -46,6 +46,45 @@ const weekEnd=w=>ds(dn(START_DATE)+w*7+6);
 function rng(v){if(v==null||v==='')return null;const m=String(v).match(/([0-9.]+)\s*[~-]\s*([0-9.]+)/);return m?(+m[1]+ +m[2])/2:(isNaN(+v)?null:+v);}
 function kc(e){const a=rng(e.kcal);return a!==null?a:nv(e.note,'kcal');}
 function pr(e){const a=rng(e.protein_g);return a!==null?a:nv(e.note,'protein');}
+let wantMealSearchFocus=false;
+function mealsForSlot(date,slot,list){
+  list=list||raw||[];
+  return list.filter(e=>e&&e.type==='meal'&&e.date===date&&e.item===slot);
+}
+function slotMealSum(rows){
+  return (rows||[]).reduce((s,e)=>({kcal:s.kcal+(kc(e)||0),prot:s.prot+(pr(e)||0)}),{kcal:0,prot:0});
+}
+function mealBasketHTML(date,slot){
+  const rows=mealsForSlot(date,slot);
+  const escJs=s=>String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  if(!rows.length)return `<div id="mealBasket" class="meal-basket" hidden></div>`;
+  const tot=slotMealSum(rows);
+  return `<div id="mealBasket" class="meal-basket">
+    <div class="meal-basket-head">이 끼니에 담은 메뉴 <b>${rows.length}개 · ${Math.round(tot.kcal).toLocaleString('ko-KR')}kcal</b></div>
+    ${rows.map(e=>`<div class="meal-basket-item">
+      <span class="nm"><b>${esc(e.value||'메뉴')}</b><span>${kc(e)!=null?`${Math.round(kc(e)).toLocaleString('ko-KR')}kcal`:''}${pr(e)!=null?` · 단백질 ${Math.round(pr(e))}g`:''}</span></span>
+      <button type="button" class="icon-btn" aria-label="삭제" onclick="removeSlotMeal('${escJs(e.id)}')">🗑️</button>
+    </div>`).join('')}
+  </div>`;
+}
+function removeSlotMeal(id){
+  if(!raw.some(e=>e.id===id&&e.type==='meal'))return toast('기록을 찾지 못했어요');
+  raw=raw.filter(e=>e.id!==id);save();toast('이 끼니에서 뺐어요');
+  const q=($('#mealMenu')||{}).value||'';
+  render();
+  const inp=$('#mealMenu');
+  if(inp){if(q){inp.value=q;if(window.DGFoodSearch)DGFoodSearch.render(q);}inp.focus();}
+}
+function restoreMealSearchFocus(){
+  if(!wantMealSearchFocus)return;
+  wantMealSearchFocus=false;
+  const inp=$('#mealMenu');
+  if(!inp)return;
+  inp.value='';
+  if(window.DGFoodSearch)DGFoodSearch.render('');
+  inp.focus({preventScroll:true});
+}
+
 function nv(note,k){const m=(note||'').match(new RegExp(k+'=([0-9.]+)'));return m?+m[1]:null;}
 const walkXp=m=>Math.min(30,Math.floor(m/30)*15);
 
@@ -172,6 +211,7 @@ function importCsv(file){const fr=new FileReader();fr.onload=()=>{const t=parseC
 const $=s=>document.querySelector(s);
 function toast(m){const t=$('#toast');if(!t)return;t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2200);}
 function add(e){const before=compute().total;raw.push(withId(e));save();const C=compute(),g=C.total-before;
+ if(e&&e.type==='meal')wantMealSearchFocus=true;
  toast(g>0?`+${g} XP 획득!`+(Math.floor(C.total/100)>Math.floor(before/100)?' 🎉 레벨업!':''):'기록했어요');render();}
 function del(id){if(!confirm('이 기록을 지울까요?'))return;raw=raw.filter(e=>e.id!==id);save();render();}
 const NAV=[['home','🏠','홈'],['quest','📋','퀘스트'],['log','📊','기록'],['ach','🛡️','업적'],['me','👤','내정보']];
@@ -181,7 +221,7 @@ function render(){migrateVitaminsOnce();const C=compute();
  $('#nav').innerHTML=NAV.map(([k,i,l])=>`<button type="button" ${tab===k?'aria-current="page"':''} onclick="tab='${k}';render()"><span class="ti">${i}</span>${l}</button>`).join('');
  if(tab!=='me'){pvKg=null;meBase=null;}
  $('#view').innerHTML=({home,quest,log,ach,me})[tab](C);
- window.scrollTo(0,0);if(window.dgMountAvatar)window.dgMountAvatar();}
+ window.scrollTo(0,0);if(window.dgMountAvatar)window.dgMountAvatar();restoreMealSearchFocus();}
 function topBar(C){const p=C.total%100;
  return `<header class="hud-wrap"><div class="hud">
   <div class="level-badge"><div><small>LV</small><b>${C.level}</b></div></div>
@@ -280,7 +320,10 @@ function setLogKind(k){logKind=k;
  document.querySelectorAll('[data-logkind]').forEach(el=>{el.hidden=el.dataset.logkind!==k;});
  document.querySelectorAll('[data-seg="kind"] button').forEach(b=>{b.setAttribute('aria-selected',b.dataset.k===k?'true':'false');});}
 function setMealKind(k){mealKind=k;
- document.querySelectorAll('[data-seg="meal"] button').forEach(b=>{b.setAttribute('aria-selected',b.dataset.k===k?'true':'false');});}
+ document.querySelectorAll('[data-seg="meal"] button').forEach(b=>{b.setAttribute('aria-selected',b.dataset.k===k?'true':'false');});
+ const hold=$('#mealBasket');
+ if(hold){const date=($('#dt')&&$('#dt').value)||logDate||today();hold.outerHTML=mealBasketHTML(date,k);}
+}
 function quest(C){const qs=questDefs(C),w=week(C.today),sc=C.strW[w]||0;
  const wk=raw.filter(e=>e.type==='weight'&&week(e.date)===w);
  const doneN=qs.filter(q=>q.done).length;
@@ -320,6 +363,7 @@ function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0
    <button type="button" class="btn-primary btn-lg" onclick="sub('weight')">체중 기록 <span class="stat-chip gold" style="min-height:26px;padding:0 8px;font-size:12px;box-shadow:none">+10 XP</span></button>`,
   meal:`<div class="label" style="font-size:13px;font-weight:700;margin-bottom:6px">끼니</div>
    <div class="segmented meal-slots" data-seg="meal" style="margin-bottom:12px;background:#F3F5FB" role="tablist">${meals.map(m=>`<button type="button" data-k="${m}" aria-selected="${mealKind===m}" onclick="setMealKind('${m}')">${m}</button>`).join('')}</div>
+   ${mealBasketHTML(T, mealKind)}
    <label class="field" style="margin-bottom:8px"><span class="label">메뉴 검색</span><input class="input" id="mealMenu" placeholder="짜장면, 치킨, 초성 ㄱㅊㅉㄱ" autocomplete="off" enterkeyhint="search" oninput="if(window.DGFoodSearch)DGFoodSearch.render(this.value)"></label>
    <div id="mealSearchBox" class="meal-search">${(window.DGFoodSearch?DGFoodSearch.emptyHTML():'')}</div>
    <div class="rowx" style="margin-bottom:14px"><label class="field"><span class="label">kcal <span class="muted">(선택)</span></span><input class="input" id="kcal" type="number" placeholder="예: 520" inputmode="numeric"></label>

@@ -1,4 +1,4 @@
-const V='dg-0.4.10';
+const V='dg-0.4.11';
 const FILES=['./','index.html','app.js','auth.js','health.js','health-ranges.js','supplements.js','coach.js','delivery-foods.js','food-search.js','delivery.js','char.png','icon-192.png','icon-512.png','manifest.webmanifest','face.js','avatar.js','vendor/three.custom.min.js','assets/avatar/char-current-0.4.9.glb','assets/avatar/char-goal-0.4.9.glb','design-tokens.css','screens.css','vendor/fonts/PretendardVariable.woff2','vendor/fonts/Lexend-latin.woff2','vendor/pdfjs/pdf.min.mjs','vendor/pdfjs/pdf.worker.min.mjs'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(FILES)));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==V).map(k=>caches.delete(k)))));self.clients.claim();});
