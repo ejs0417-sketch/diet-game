@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.0 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인)
-const VERSION='0.4.0', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.1 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 비타민 XP)
+const VERSION='0.4.1', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const SEED=[
@@ -11,10 +11,11 @@ const ACH=[
  ['식단 지킴이','1,600~2,000kcal·단백질 130g+ 7일 누적',40,'🥗'],['걷기 습관','걷기 40~60분 7일 누적',40,'👟'],
  ['근력 스타트','근력 주 2회 처음 채움',30,'💪'],['스트릭 7','체중 기록 7일 연속',30,'🔥'],
  ['한 달 최소 목표','2단계 달성 (XP는 단계 보상으로 지급)',100,'🎯'],['보스 토벌','정체기 보스 첫 클리어',50,'🐉'],
- ['첫 동기화','로컬과 계정을 처음 맞췄을 때',20,'☁️']];
+ ['첫 동기화','로컬과 계정을 처음 맞췄을 때',20,'☁️'],
+ ['첫 비타민','비타민을 처음 기록했을 때',10,'💊'],['비타민 7일 연속','비타민을 7일 연속 기록',30,'✨']];
 const DERIVED=new Set(['quest','weekly_weight','warning']);
 
-let logDate=null,raw=load(), settings=Object.assign({goal:95,month:109},JSON.parse(localStorage.getItem(SKEY)||'{}')), tab='home';
+let logDate=null,raw=load(), settings=Object.assign({goal:95,month:109,vitamins:['종합비타민']},JSON.parse(localStorage.getItem(SKEY)||'{}')), tab='home';
 function load(){const s=localStorage.getItem(KEY);return s?JSON.parse(s):[];}
 function ensureSeed(){if(!raw.length){raw=SEED.map(withId);localStorage.setItem(KEY,JSON.stringify(raw));}}
 function save(){localStorage.setItem(KEY,JSON.stringify(raw));if(window.DGAuth)DGAuth.schedulePush();}
@@ -44,7 +45,7 @@ function compute(T){
  T=T||today();
  const evs=raw.filter(e=>e.date<=T).slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
  const first=evs.length?evs[0].date:START_DATE;
- const rows=[],status=[],days={},got={},stages={};let streak=0,lastW=null,strW={},lastAvg=START_W,good=0,walkDays=0;
+ const rows=[],status=[],days={},got={},stages={};let streak=0,lastW=null,strW={},lastAvg=START_W,good=0,walkDays=0,vitStreak=0,lastVit=null;
  const wByWeek={},lowWeek={},weekly={};let flatWeeks=0,boss=null,bossHist=[],notice=null;
  let pred=START_W,curW=START_W,bmrWk=null,bmrW=START_W,bmr=mifflin(START_W,START_DATE),lastSeenW=null;
  const award=(d,name,note,xp)=>{if(got[name])return;const a=ACH.find(x=>x[0]===name);got[name]=d;const r={date:d,type:'achievement',item:name,value:'',xp:xp??a[2],note:note||''};rows.push(r);return r;};
@@ -53,7 +54,7 @@ function compute(T){
    if(i===1)award(d,'한 달 최소 목표','2단계와 같음',0);});};
  for(let n=Math.min(dn(first),dn(START_DATE));n<=dn(T);n++){
   const d=ds(n),es=evs.filter(e=>e.date===d),wk=week(d);
-  const info={weight:null,meals:{},kcal:0,prot:0,missingKcal:0,mealCount:0,walk:0,strength:0,strMin:0,rest:false,water:0,warn:false,bonus:0,closed:false};
+  const info={weight:null,meals:{},kcal:0,prot:0,missingKcal:0,mealCount:0,walk:0,strength:0,strMin:0,rest:false,water:0,warn:false,bonus:0,closed:false,vit:{},vitXp:0};
   days[d]=info;const mealRows=[],habit=[];let seenMeal={},cumWalk=0;
   for(const e of es){
    const r={date:d,type:e.type,item:e.item,value:e.value,xp:0,kcal:e.kcal||'',protein_g:e.protein_g||'',kcal_source:e.kcal_source||'',note:e.note||'',id:e.id};
@@ -65,8 +66,10 @@ function compute(T){
    else if(e.type==='exercise'&&e.item==='근력'){info.strMin+=(+e.value>0?+e.value:STR_DEFAULT_MIN);if(!info.strength){info.strength=1;strW[wk]=(strW[wk]||0)+1;if(strW[wk]<=3){r.xp=15;habit.push(r);}if(strW[wk]===2)award(d,'근력 스타트');}}
    else if(e.type==='rest'){info.rest=true;}
    else if(e.type==='water'){const before=info.water;info.water=+(info.water+(+e.value||0)).toFixed(2);if(before<2&&info.water>=2){r.xp=5;habit.push(r);}}
+   else if(e.type==='vitamin'){if(e.item&&!info.vit[e.item]){info.vit[e.item]=1;const left=15-info.vitXp;r.xp=Math.max(0,Math.min(5,left));info.vitXp+=r.xp;}}
    else if(e.type==='achievement'){const a=ACH.find(x=>x[0]===e.item);if(a&&!got[a[0]]){got[a[0]]=d;r.xp=a[2];}else continue;}
    rows.push(r);
+   if(e.type==='vitamin'&&info.vit[e.item]&&!got['첫 비타민'])award(d,'첫 비타민');
   }
   if(info.walk>=40&&info.walk<=60){const r={date:d,type:'exercise',item:'걷기가산',value:info.walk,xp:10,note:'40~60분'};rows.push(r);habit.push(r);}
   // 식사 마감 정산 (버튼 누른 날만)
@@ -85,6 +88,10 @@ function compute(T){
    if(streak%7===0){rows.push({date:d,type:'quest',item:'스트릭7',value:streak,xp:50,note:''});award(d,'스트릭 7');}}
   else if(!(d===T&&lastW===n-1))streak=0;
   info.streak=streak;
+  // 비타민 스트릭 (하루 한 번 이상 기록한 날만)
+  if(Object.keys(info.vit).length){vitStreak=(lastVit===n-1)?vitStreak+1:1;lastVit=n;if(vitStreak>=7)award(d,'비타민 7일 연속');}
+  else vitStreak=0;
+  info.vitStreak=vitStreak;
   // 예측 체중 (마감한 날만, 1,600 미만은 1,600으로 계산)
   // 기초대사량은 주마다 다시 계산: 그 주 시작일까지 7일 체중 평균 → 없으면 최근 체중 → 113
   if(info.weight!==null)lastSeenW=info.weight;
@@ -170,7 +177,24 @@ function home(C){const qs=questDefs(C),show=qs.filter(q=>!q.done).slice(0,3);whi
  return topBar(C)+warnBanner(C)+`<div class="hero"><div class="avatar" id="avatarSlot" data-kg="${C.avatarW.toFixed(2)}" data-ghost="${C.pred.toFixed(2)}" data-idle="0.35"><img class="fallback" src="char.png" alt="캐릭터" style="transform:scale(${1-0.05*C.nStage},1)"><div class="avcap">주간 평균 ${C.avatarW.toFixed(1)}kg 체형${C.pred<=C.avatarW-0.1?' · 연두=예측':''}</div></div><div class="card wt" onclick="tab='log';render()">⚖️<div class="muted">현재 체중</div><b>${C.weight.toFixed(1)}kg</b><div>🎯 목표 <b style="display:inline;font-size:18px;color:#222">${settings.goal}kg</b></div><div class="muted">이번 달 목표 ${settings.month}kg · 감량 ${(START_W-C.weight).toFixed(1)}kg</div><div class="muted">📈 예측 ${predRange(C)} <span style="font-size:11px">(건강관리 확인됨)</span></div>${C.next?`<div class="muted">다음 단계 ${C.next[0]}kg ${C.next[2]}</div>`:''}</div></div>
  <div style="display:flex;justify-content:space-between;align-items:center"><h3>오늘의 퀘스트 ⭐</h3><span class="muted" onclick="tab='quest';render()">${all?'모두 완료! +20 XP':'모두 완료하면 +20 XP'} ›</span></div>${show.map(qCard).join('')}
  <div class="card"><b>빠른 기록</b><div>${quick()}</div><div class="muted">🔥 스트릭 ${C.streak}일</div></div>`;}
-function quick(){return `<button class="btn" onclick="askWeight()">⚖️ 체중</button><button class="btn" onclick="tab='log';render();setTimeout(()=>$('#mealMenu').focus(),50)">🍱 식사</button><button class="btn" onclick="addWalk()">👟 걷기</button><button class="btn" onclick="add({date:today(),type:'water',item:'물',value:'0.5',note:''})">💧 물 0.5L</button>`;}
+function quick(){return `<button class="btn" onclick="askWeight()">⚖️ 체중</button><button class="btn" onclick="tab='log';render();setTimeout(()=>$('#mealMenu').focus(),50)">🍱 식사</button><button class="btn" onclick="addWalk()">👟 걷기</button><button class="btn" onclick="add({date:today(),type:'water',item:'물',value:'0.5',note:''})">💧 물 0.5L</button>${vitButtons(today())}`;}
+function vitList(){if(!Array.isArray(settings.vitamins))return ['종합비타민'];return [...new Set(settings.vitamins.map(s=>String(s).trim()).filter(Boolean))];}
+function hasVit(d,item){return raw.some(e=>e.date===d&&e.type==='vitamin'&&e.item===item);}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+function vitButtons(d){d=d||today();const items=vitList(),multi=items.length>1;
+ if(!items.length)return `<div class="muted" onclick="tab='me';render()">비타민을 내정보에서 추가해 주세요 ›</div>`;
+ return items.map(name=>{const on=hasVit(d,name);const label=multi?(on?'✅ ':'💊 ')+esc(name):(on?'✅ 비타민 먹었어요':'💊 비타민 먹었어요');
+  return `<button class="btn${on?' g':''}" onclick="toggleVit('${escJs(name)}','${d}')">${label}</button>`;}).join('');}
+function toggleVit(item,d){d=d||today();item=String(item||'').trim();if(!item)return;
+ const existing=raw.find(e=>e.date===d&&e.type==='vitamin'&&e.item===item);
+ if(existing){raw=raw.filter(e=>e.id!==existing.id);save();toast('비타민 기록을 취소했어요');render();}
+ else add({date:d,type:'vitamin',item,value:'1',note:''});}
+function addVitName(){const el=$('#vitNew');const name=(el&&el.value||'').trim();if(!name)return toast('이름을 적어 주세요');
+ if(name.length>20)return toast('이름은 20자 이하로 적어 주세요');
+ const cur=vitList();if(cur.includes(name))return toast('이미 있어요');
+ settings.vitamins=cur.concat([name]);saveSettings();toast('비타민을 추가했어요');render();}
+function removeVit(name){name=String(name||'').trim();settings.vitamins=vitList().filter(x=>x!==name);saveSettings();render();}
 function predRange(C){return `${(C.pred-0.5).toFixed(1)}~${(C.pred+0.5).toFixed(1)}kg`;}
 function askYesterday(d){const y=ds(dn(d)-1),C=compute(),Y=C.days[y],k='dg_asked_'+y;if(!Y||Y.closed||!Y.mealCount||localStorage.getItem(k))return;localStorage.setItem(k,'1');
  if(confirm(`어제(${y.slice(5)}) 식사가 마감되지 않았어요. 빠진 끼니 있나요?\n확인을 누르면 어제 기록으로 가서 추가하고 마감할 수 있어요.`)){tab='log';logDate=y;render();}}
@@ -207,9 +231,10 @@ function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0
  <div class="row"><select id="mealT"><option>아침</option><option>점심</option><option>저녁</option><option>간식</option></select><input id="mealMenu" placeholder="메뉴"></div>
  <div class="row"><input id="kcal" type="number" placeholder="kcal (선택)"><input id="prot" type="number" placeholder="단백질 g (선택)"><button class="btn" onclick="sub('meal')">식사</button></div>
  <div class="row"><select id="exT"><option>걷기</option><option>근력</option></select><input id="min" type="number" placeholder="분"><button class="btn" onclick="sub('exercise')">운동</button></div>
- <div class="row"><input id="wat" type="number" step="0.1" placeholder="물 L"><button class="btn" onclick="sub('water')">물</button></div></div>
+ <div class="row"><input id="wat" type="number" step="0.1" placeholder="물 L"><button class="btn" onclick="sub('water')">물</button></div>
+ <div class="muted" style="margin-top:6px">비타민 (하루에 종류마다 한 번, 다시 누르면 취소)</div><div>${vitButtons(T)}</div></div>
  <div class="card"><h3>${T===C.today?'오늘':T.slice(5)} 합계 ${d.closed?'· 마감 ✅':''}</h3>식사 ${d.mealCount}끼 · ${d.kcal}kcal${d.missingKcal?' (kcal 빠진 끼니 '+d.missingKcal+'개)':''} · 단백질 ${d.prot}g
- <div class="bar c" style="margin:6px 0"><i style="width:${Math.min(100,d.kcal/1800*100)}%"></i><span>칼로리 ${d.kcal} / 1,800kcal</span></div><div class="bar" style="margin:6px 0"><i style="width:${Math.min(100,d.prot/130*100)}%"></i><span>단백질 ${d.prot} / 130g</span></div>${d.closed?'':'<div class="muted">미정산</div>'}걷기 ${d.walk}분 · 근력 ${d.strength?'O':'X'} · 물 ${d.water}L${d.rest?' · 휴식':''}
+ <div class="bar c" style="margin:6px 0"><i style="width:${Math.min(100,d.kcal/1800*100)}%"></i><span>칼로리 ${d.kcal} / 1,800kcal</span></div><div class="bar" style="margin:6px 0"><i style="width:${Math.min(100,d.prot/130*100)}%"></i><span>단백질 ${d.prot} / 130g</span></div>${d.closed?'':'<div class="muted">미정산</div>'}걷기 ${d.walk}분 · 근력 ${d.strength?'O':'X'} · 물 ${d.water}L${d.rest?' · 휴식':''} · 비타민 ${Object.keys(d.vit||{}).length}개
  <div class="muted">목표 1,800kcal 안팎 · 단백질 130g+ · 1,600kcal 미만이면 식단 점수 없음</div>${d.closed?'':`<button class="btn c" style="width:100%;margin-top:8px" onclick="closeMeals('${T}')">🍽️ ${T===C.today?'오늘':T.slice(5)} 식사 마감</button>`}</div>
  <div class="card"><h3>예측 체중</h3><b>${predRange(C)}</b><div class="muted">마감한 날의 먹은 칼로리와 걷기로 계산해요. 가정: 기초대사(Mifflin, 주마다 재계산, 지금 약 ${C.bmr.toLocaleString()}kcal)×1.2 + 운동 (MET−1)×체중×시간(걷기·근력 3.5 MET, 근력 시간 없으면 30분), 7,700kcal≈1kg (건강관리 확인됨). 1,600kcal 미만인 날은 1,600으로 계산해요.</div></div>
  <div class="card"><h3>체중 기록</h3>${chart(C)}<table><tr><th>날짜</th><th>체중</th><th>감량</th></tr>${wts.reverse().map(s=>`<tr><td>${s.date}</td><td>${s.weight}</td><td>${s.lost_kg}</td></tr>`).join('')}</table>
@@ -224,9 +249,16 @@ function sub(t){const d=$('#dt').value||today();
 function ach(C){return topBar(C)+`<div class="card"><h3>단계 목표</h3><div class="muted">주간 평균(3일 이상 기록)으로 판정해요. 기한은 2단계만. 95·86kg은 확정 대기.</div>${LADDER.map(([kg,xp,t],i)=>`<div class="ach ${C.stages[i]?'':'no'}"><div class="ic">${['👣','🎯','📉','💯','🏆','💚'][i]}</div><div style="flex:1"><b>${i+1}단계 ${t}</b><div class="muted">${kg}kg 이하${i===1?' · 2026-12-10까지':''}</div></div><div>${C.stages[i]?C.stages[i].slice(5)+'<br>':''}+${xp}</div></div>`).join('')}</div><div class="card"><h3>업적</h3>${ACH.map(a=>`<div class="ach ${C.got[a[0]]?'':'no'}"><div class="ic">${a[3]}</div><div style="flex:1"><b>${a[0]}</b><div class="muted">${a[1]}</div></div><div>${C.got[a[0]]?C.got[a[0]].slice(5)+'<br>':''}+${a[2]}</div></div>`).join('')}</div>`;}
 function me(C){return topBar(C)+(window.DGAuth?DGAuth.accountCard():'')+makeMe(C)+`<div class="card"><h3>내 정보</h3>시작 ${START_W}kg (${START_DATE}) · 현재 ${C.weight.toFixed(1)}kg<br>이번 달 목표 ${settings.month}kg (~12/10) · 장기 목표 ${settings.goal}kg<br>레벨 ${C.level} · 누적 ${C.total} XP · 코인 ${C.coins} · 스트릭 ${C.streak}일
  <div class="row" style="margin-top:8px"><input id="goal" type="number" step="0.5" value="${settings.goal}"><button class="btn" onclick="settings.goal=+$('#goal').value;saveSettings();render()">장기 목표 저장</button></div></div>
+ ${vitCard()}
  <div class="card"><h3>기록 백업</h3><div class="muted">게임 마스터와 같은 log.csv·status.csv 형식이에요.</div>
  <button class="btn" onclick="exportCsv()">내보내기</button><label class="btn" style="display:inline-block">가져오기 (log.csv)<input type="file" accept=".csv,text/csv" style="display:none" onchange="importCsv(this.files[0])"></label></div>
  <div class="card muted">다이어트 게임 ${VERSION} · 기획서 v3 규칙</div>`;}
+function vitCard(){const items=vitList();
+ return `<div class="card" id="vitCard"><h3>💊 비타민</h3>
+  <div class="muted">하루에 종류마다 한 번 기록해요. 하나당 +5 XP, 하루 최대 +15 XP. 7일 연속하면 업적 보너스가 있어요.</div>
+  ${items.length?items.map(n=>`<div class="row" style="align-items:center"><div style="flex:2">${esc(n)}</div><button class="btn g" onclick="removeVit('${escJs(n)}')">삭제</button></div>`).join(''):'<div class="muted">아직 없어요. 아래에서 추가해 주세요.</div>'}
+  <div class="row"><input id="vitNew" placeholder="예: 오메가3, 비타민D"><button class="btn" onclick="addVitName()">추가</button></div>
+ </div>`;}
 // ---------- 나 만들기 (3D 아바타) ----------
 const FACEKEY='dg_face_v1';let pvKg=null,meBase=null;
 function makeMe(C){const base=meBase??+C.avatarW.toFixed(1),goal=settings.goal,v=pvKg??base,hasFace=!!localStorage.getItem(FACEKEY);

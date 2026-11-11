@@ -1,4 +1,4 @@
-// 다이어트 게임 0.4.0 — Google 로그인·동기화 (Supabase Auth, 기획서 v3 6절)
+// 다이어트 게임 0.4.1 — Google 로그인·동기화 (Supabase Auth, 기획서 v3 6절)
 // SB_ANON은 공개용 anon 키입니다. service_role·관리 토큰·DB 비밀번호는 넣지 않습니다.
 const SB_URL='https://ifdgncmhpclthudlvowe.supabase.co';
 const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmZGduY21ocGNsdGh1ZGx2b3dlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQzNDgzMTAsImV4cCI6MjEwOTkyNDMxMH0.XFJoRuKM0FOxmK2fbHb7kkdO_2dKp_RN-YIflWiJzvw';
@@ -58,12 +58,16 @@ const DGAuth=(function(){
   }
   function profileOf(){
     const u=session&&session.user;
-    return {goal:settings.goal,month:settings.month,height:HEIGHT,display_name:(u&&(u.name||u.email))||''};
+    return {goal:settings.goal,month:settings.month,height:HEIGHT,display_name:(u&&(u.name||u.email))||'',vitamins:Array.isArray(settings.vitamins)?settings.vitamins.slice():['종합비타민']};
   }
   function applyProfile(p){
     if(!p||typeof p!=='object')return;
     if(p.goal>0)settings.goal=+p.goal;
     if(p.month>0)settings.month=+p.month;
+    if(Array.isArray(p.vitamins)){
+      const vs=[...new Set(p.vitamins.map(x=>String(x).trim()).filter(Boolean))];
+      settings.vitamins=vs.length?vs:(settings.vitamins||['종합비타민']);
+    }
     localStorage.setItem(SKEY,JSON.stringify(settings));
   }
   function setRaw(evs){raw=Array.isArray(evs)?evs.map(e=>Object.assign({},e)):[];localStorage.setItem(KEY,JSON.stringify(raw));}
@@ -383,7 +387,7 @@ const DGAuth=(function(){
     clearSession();
     localStorage.removeItem(GATEKEY);
     if(wipe){
-      raw=[]; settings={goal:95,month:109};
+      raw=[]; settings={goal:95,month:109,vitamins:['종합비타민']};
       localStorage.removeItem(KEY); localStorage.removeItem(SKEY);
     }
     toast(wipe?'계정을 삭제하고 폰 기록도 지웠어요':'계정을 삭제했어요. 이 폰 기록은 남아 있어요.');

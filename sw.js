@@ -1,4 +1,4 @@
-const V='dg-0.4.0';
+const V='dg-0.4.1';
 const FILES=['./','index.html','app.js','auth.js','char.png','icon-192.png','icon-512.png','manifest.webmanifest','avatar.js','vendor/three.custom.min.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(FILES)));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==V).map(k=>caches.delete(k)))));self.clients.claim();});
