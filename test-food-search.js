@@ -39,13 +39,27 @@ has('냉면', h=>h.item.id==='mul-naengmyeon'||h.item.id==='bibim-naengmyeon', '
 const jj=search.searchFoods('짜장면',{foods:foods.FOODS,limit:5})[0];
 assert.ok(jj && jj.item.kcal>=700 && jj.item.unit==='1인분', '짜장면 kcal 1인분');
 
-assert.strictEqual(foods.count, 283, '음식 283개 (기존 230 + 프랜차이즈 공식 53)');
+assert.strictEqual(foods.count, 301, '음식 301개 (기존 283 + 기본음식 18)');
 
 // 짧은 한글 검색이 초성 오탐으로 엉뚱한 메뉴를 넣지 않아요
 const kimchi=names('김치');
 assert(kimchi.includes('김치찌개') && kimchi.includes('김치볶음밥'), '김치 계열');
 assert(!kimchi.some(n=>n.includes('고추마요')||n.includes('설빙')||n.includes('레드콤보')||n.includes('감자튀김')), '김치 오탐 없음: '+kimchi.join(','));
 assert.strictEqual(kimchi[0], '김치찌개', '김치 첫 결과 '+kimchi[0]);
+
+// 0.4.15 다이어트 기본 음식
+has('우유', h=>h.item.id==='staple-milk', '우유');
+has('흰우유', h=>h.item.id==='staple-milk', '별칭 흰우유');
+has('ㅇㅇ', h=>h.item.id==='staple-milk', '초성 ㅇㅇ → 우유');
+has('저지방우유', h=>h.item.id==='staple-lowfat-milk', '저지방우유');
+has('요거트', h=>h.item.id==='staple-plain-yogurt', '요거트');
+has('고구마', h=>h.item.id==='staple-goguma', '고구마');
+has('달걀', h=>h.item.id==='staple-egg', '달걀');
+has('계란', h=>h.item.id==='staple-egg', '별칭 계란');
+has('ㄷㄱ', h=>h.item.id==='staple-egg', '초성 ㄷㄱ → 달걀');
+const milk=foods.FOODS.find(x=>x.id==='staple-milk');
+assert.ok(milk&&milk.kcal===125&&milk.protein===6, '우유 1교환 125kcal');
+console.log('0.4.15 staple food tests ok');
 
 console.log('food-search tests ok', {짜장:names('짜장').slice(0,3), 초성:names('ㄱㅊㅉㄱ').slice(0,3), 치킨:names('치킨').slice(0,5)});
 

@@ -1,6 +1,7 @@
-// 다이어트 게임 0.4.9 — 기본은 승인된 시안에서 만든 GLB 3D 캐릭터(현재 체형/목표 체형 2개를 체중 진행도로 크로스페이드).
-// GLB를 못 불러오거나 '직접 다듬기' 모드면 0.4.7 절차적 캐릭터(파라미터로 조각, 사진은 텍스처로 쓰지 않음)로 폴백한다.
-// 키 186cm 고정. 체중 113~86kg 사이 7개 기준 단계를 연속 보간해서 배·허리·팔·다리·볼 두께가 바뀐다.
+// 다이어트 게임 0.4.15 — 기본은 승인된 시안의 5단계 GLB 캐릭터(0·25·50·75·100%).
+// 누적 예상 체중 진행도에 가장 가까운 단계 모델을 보여 주고, 단계가 바뀔 때는 이전 모델을 먼저 숨긴 뒤 다음 모델을 짧게 페이드인한다.
+// 두 모델을 반투명으로 겹치지 않는다. GLB를 못 불러오거나 '직접 다듬기' 모드면 0.4.7 절차적 캐릭터로 폴백한다.
+// 키 186cm 고정. 절차적 폴백은 체중 113~86kg 사이 7개 기준 단계를 보간한다.
 import * as T from './vendor/three.custom.min.js';
 
 const ANCHORS=[[113,1],[111,.88],[109,.76],[105,.56],[100,.36],[95,.18],[86,0]];
@@ -12,14 +13,22 @@ export function shapeOf(kg){
   return 0;
 }
 const L=(a,b,f)=>a+(b-a)*f;
-// ---- 0.4.9 GLB 캐릭터 ----
-const GLB_URL={cur:'assets/avatar/char-current-0.4.9.glb',goal:'assets/avatar/char-goal-0.4.9.glb'};
+// ---- 0.4.15 5단계 GLB 캐릭터 (0·100%는 0.4.9 현재/목표 모델) ----
+const STAGE_GLB=[
+  {p:0,url:'assets/avatar/char-00-0.4.15.glb'},
+  {p:.25,url:'assets/avatar/char-25-0.4.15.glb'},
+  {p:.5,url:'assets/avatar/char-50-0.4.15.glb'},
+  {p:.75,url:'assets/avatar/char-75-0.4.15.glb'},
+  {p:1,url:'assets/avatar/char-100-0.4.15.glb'},
+];
+const GLB_URL={cur:STAGE_GLB[0].url,goal:STAGE_GLB[4].url};
 const MODE_KEY='dg_avatar_mode'; // 'glb'(기본) | 'proc'(0.4.7 직접 다듬기 캐릭터)
 const clamp01=x=>Math.max(0,Math.min(1,x));
 const smooth=x=>{x=clamp01(x);return x*x*(3-2*x);};
-// 진행도 0(시작 체중)~1(목표 체중). 0~50%는 현재 체형, 50%를 넘으면 목표 체형으로 서서히 바뀐다.
+// 진행도 0(시작 체중)~1(목표 체중). 0부터 100%까지 체형이 연속으로 줄어든다(50%에서 갑자기 바꾸지 않음).
 export function progressOf(kg,start=113,goal=95){const d=start-goal;if(!(d>0)||!(kg>0))return 0;return clamp01((start-kg)/d);}
-export function blendOf(p){return p<=.5?0:smooth((p-.5)/.5);}
+export function blendOf(p){return clamp01(p);} // 0.4.15: 진행도 전체를 변형량으로 씀(구 크로스페이드 지연 제거)
+export function easeInOut(t){t=clamp01(t);return t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;}
 export function readMode(){try{return localStorage.getItem(MODE_KEY)==='proc'?'proc':'glb';}catch(e){return 'glb';}}
 
 const LEGUP=.07;
@@ -276,42 +285,111 @@ function buildBody(f,isGhost,lk){
 }
 function disposeTree(o){o.traverse(n=>{if(n.geometry)n.geometry.dispose();});}
 
-function glbActive(){return mode==='glb'&&glb.status==='ready';}
+function glbActive(){return mode==='glb'&&glb.status==='ready'&&glb.stages&&glb.stages.length;}
+function nearestStage(p,stages){
+  const list=stages||glb.stages||[];
+  if(!list.length)return null;
+  let best=list[0],d=Math.abs(p-list[0].p);
+  for(const s of list){
+    const dd=Math.abs(p-s.p);
+    if(dd<d-1e-9||(Math.abs(dd-d)<1e-9&&s.p>best.p)){best=s;d=dd;}
+  }
+  return best;
+}
+function paintGlb(root){
+  if(!root)return;
+  root.traverse(n=>{if(n.isMesh){
+    const m=n.material,map=m&&m.map;if(map){map.colorSpace=T.SRGBColorSpace;map.anisotropy=4;}
+    n.material=new T.MeshBasicMaterial({map:map||null,color:0xffffff});n.frustumCulled=false;}});
+}
 function loadGlbs(){
   if(glb.status!=='idle'||failed)return;glb.status='loading';
   const ld=new T.GLTFLoader();
   const one=u=>new Promise((res,rej)=>{const to=setTimeout(()=>rej(new Error('timeout')),25000);
     ld.load(u,g=>{clearTimeout(to);res(g.scene);},undefined,e=>{clearTimeout(to);rej(e);});});
-  Promise.all([one(GLB_URL.cur),one(GLB_URL.goal)]).then(([c,g])=>{
-    for(const o of [c,g])o.traverse(n=>{if(n.isMesh){
-      const m=n.material,map=m&&m.map;if(map){map.colorSpace=T.SRGBColorSpace;map.anisotropy=4;}
-      // 텍스처에 이미 명암이 구워져 있어서 조명 없이(unlit) 그대로 보여준다
-      n.material=new T.MeshBasicMaterial({map:map||null,color:0xffffff});n.frustumCulled=false;}});
-    glb.cur=c;glb.goal=g;glb.status='ready';rebuild();
+  Promise.all(STAGE_GLB.map(s=>one(s.url).then(root=>{paintGlb(root);root.visible=false;return {p:s.p,url:s.url,root};}).catch(e=>{
+    try{console.warn('단계 GLB 로드 실패',s.url,e);}catch(_){}
+    return null;
+  }))).then(list=>{
+    const ok=list.filter(Boolean);
+    if(!ok.length)throw new Error('no stage glb');
+    ok.sort((a,b)=>a.p-b.p);
+    glb.stages=ok;glb.cur=ok[0].root;glb.goal=ok[ok.length-1].root;
+    glb.shown=null;glb.morphReady=true;glb.status='ready';rebuild();
   }).catch(e=>{glb.status='failed';try{console.warn('GLB 로드 실패, 절차적 캐릭터로 대체',e);}catch(_){}rebuild();});
 }
-function setOpacity(o,op){o.traverse(n=>{if(n.isMesh){const m=n.material,tr=op<.999;
+function setOpacity(o,op){if(!o)return;o.traverse(n=>{if(n.isMesh){const m=n.material,tr=op<.999;
   m.transparent=tr;m.opacity=op;m.depthWrite=!tr;m.needsUpdate=true;}});}
-function glbShade(){ // 진행도에 맞춰 두 모델 크로스페이드 + 약간의 스케일 보간
-  const p=progressOf(state.kg,state.start,state.goal),t=blendOf(p);
-  const cs=(1-.05*Math.min(1,p*2))*(1-.03*t),gs=.965+.035*t;
-  glb.cur.visible=t<.999;glb.goal.visible=t>.001;
-  glb.cur.userData.sx=cs;glb.goal.userData.sx=gs;
-  glb.cur.renderOrder=1;glb.goal.renderOrder=2;
-  glb.cur.traverse(n=>{n.renderOrder=1;});glb.goal.traverse(n=>{n.renderOrder=2;});
-  setOpacity(glb.cur,t<.001?1:1-t);setOpacity(glb.goal,t>.999?1:t);
+function hideAllStages(){(glb.stages||[]).forEach(s=>{if(s.root){s.root.visible=false;setOpacity(s.root,1);}});}
+function showStage(st,op){if(!st||!st.root)return;st.root.visible=true;setOpacity(st.root,op==null?1:op);glb.shown=st;glb.cur=st.root;}
+let morphAnim=null,stageFade=null;
+function currentProgress(){return progressOf(state.kg,state.start,state.goal);}
+function glbShade(){
+  morphAnim=null;stageFade=null;
+  const p=currentProgress();
+  const st=nearestStage(p);
+  hideAllStages();
+  if(st)showStage(st,1);
   applyGlbPose(0);
-  // 예측 고스트: 가까운 쪽 모델을 초록 반투명으로
   if(gGlb){gRoot.remove(gGlb);gGlb=null;}
   if(state.ghostKg!=null){const gp=progressOf(state.ghostKg,state.start,state.goal);
-    if(gp>p+.01){const src=blendOf(gp)>.5?glb.goal:glb.cur;gGlb=src.clone(true);
-      gGlb.visible=true;gGlb.userData.sx=src===glb.goal?.965+.035*blendOf(gp):(1-.05*Math.min(1,gp*2))*(1-.03*blendOf(gp));
-      gGlb.traverse(n=>{if(n.isMesh)n.frustumCulled=false;});gRoot.add(gGlb);}}
+    const gs=nearestStage(gp);
+    if(gs&&(!st||gs.p>st.p+.01)){gGlb=gs.root.clone(true);
+      gGlb.traverse(n=>{if(n.isMesh&&n.geometry){n.geometry=n.geometry.clone();n.frustumCulled=false;}});
+      gGlb.visible=true;setOpacity(gGlb,1);gRoot.add(gGlb);}}
   applyGlbPose(0);
 }
-function applyGlbPose(breath){ // breath: -1~1 숨쉬기
-  for(const o of [glb&&glb.cur,glb&&glb.goal,gGlb]){if(!o)continue;
-    const sx=o.userData.sx||1;o.scale.set(sx*(1-.004*breath),1+.008*breath,sx*(1-.004*breath));}
+function applyGlbPose(breath){
+  const roots=[glb&&glb.shown&&glb.shown.root,gGlb].filter(Boolean);
+  for(const o of roots){const sx=o.userData.sx||1;o.scale.set(sx*(1-.004*breath),1+.008*breath,sx*(1-.004*breath));}
+}
+function playMorph(toKg,ms){
+  if(!glbActive()||!glb.shown){state.kg=toKg;if(glbActive()&&glbShown)glbShade();else rebuild();dirty=true;return;}
+  const from=state.kg, t0=(typeof performance!=='undefined'?performance.now():Date.now());
+  morphAnim={from,to:+toKg,t0,ms:Math.max(200,ms||900)};
+  dirty=true;
+}
+function beginStageFade(next){
+  if(!next||!next.root)return;
+  const cur=glb.shown;
+  if(!cur||cur===next){hideAllStages();showStage(next,1);stageFade=null;return;}
+  const now=(typeof performance!=='undefined'?performance.now():Date.now());
+  // 이전 모델을 먼저 숨기고(페이드아웃), 그다음 다음 모델만 페이드인. 동시에 반투명으로 겹치지 않음.
+  stageFade={from:cur,to:next,t0:now,ms:180,phase:'out'};
+}
+function stepFade(now){
+  if(!stageFade)return;
+  const t=clamp01((now-stageFade.t0)/stageFade.ms);
+  const u=easeInOut(t);
+  if(stageFade.phase==='out'){
+    if(stageFade.to)stageFade.to.root.visible=false;
+    if(stageFade.from){stageFade.from.root.visible=true;setOpacity(stageFade.from.root,1-u);}
+    if(t>=1){
+      if(stageFade.from){stageFade.from.root.visible=false;setOpacity(stageFade.from.root,1);}
+      showStage(stageFade.to,0);
+      stageFade={from:stageFade.from,to:stageFade.to,t0:now,ms:180,phase:'in'};
+    }
+  }else{
+    if(stageFade.from)stageFade.from.root.visible=false;
+    showStage(stageFade.to,u);
+    if(t>=1){showStage(stageFade.to,1);stageFade=null;}
+  }
+  dirty=true;
+}
+function stepMorph(now){
+  if(stageFade)stepFade(now);
+  if(!morphAnim)return;
+  const t=clamp01((now-morphAnim.t0)/morphAnim.ms);
+  const u=easeInOut(t);
+  const kg=morphAnim.from+(morphAnim.to-morphAnim.from)*u;
+  state.kg=kg;
+  const st=nearestStage(progressOf(kg,state.start,state.goal));
+  if(st&&glb.shown!==st&&!stageFade)beginStageFade(st);
+  applyGlbPose(0);
+  dirty=true;
+  if(t>=1){state.kg=morphAnim.to;morphAnim=null;
+    if(!stageFade){const fin=nearestStage(currentProgress());hideAllStages();if(fin)showStage(fin,1);}
+  }
 }
 function rebuild(){if(!scene)return;
   if(body){root.remove(body);disposeTree(body);body=null;}
@@ -321,7 +399,7 @@ function rebuild(){if(!scene)return;
   mode=readMode();
   if(mode==='glb'&&glb.status==='idle')loadGlbs();
   if(glbActive()){
-    glbRoot=new T.Group();glbRoot.add(glb.cur);glbRoot.add(glb.goal);root.add(glbRoot);glbShown=true;glbShade();
+    glbRoot=new T.Group();(glb.stages||[]).forEach(s=>glbRoot.add(s.root));root.add(glbRoot);glbShown=true;glbShade();
   }else if(mode==='proc'||glb.status==='failed'){
     glbShown=false;
     body=buildBody(shapeOf(state.kg),false,look);root.add(body);
@@ -364,9 +442,10 @@ function frame(){if(!host)return;
       camera.position.set(0,.95,Math.max(distH,distW)*1.02);camera.lookAt(0,.86,0);camera.updateProjectionMatrix();dirty=true;}}
 }
 function loop(t){raf=0;if(!host||!host.isConnected||document.hidden){return;}
-  if(glbShown&&idleSpeed&&!drag&&lastT&&t-lastT<30){raf=requestAnimationFrame(loop);return;} // 대기 애니메이션은 30fps 이하로
+  if(glbShown&&idleSpeed&&!drag&&!morphAnim&&!stageFade&&lastT&&t-lastT<30){raf=requestAnimationFrame(loop);return;} // 대기 애니메이션은 30fps 이하로
   const dt=lastT?Math.min(.05,(t-lastT)/1000):0;lastT=t;
   if(glbShown){ // GLB: 얼굴이 잘 보이게 살짝 좌우로 흔들리는 대기 동작 + 숨쉬기
+    if(morphAnim||stageFade)stepMorph(t);
     if(idleSpeed&&!drag){phase+=dt;dirty=true;}
     const sway=idleSpeed&&!drag?Math.sin(phase*idleSpeed*1.7)*.5:0;
     rotY=swayBase+sway;
@@ -417,8 +496,12 @@ const api={
     rebuild();
     if(ro)ro.disconnect();if(window.ResizeObserver){ro=new ResizeObserver(()=>{dirty=true;});ro.observe(el);}
     dirty=true;stop();start();return true;},
-  setWeight(kg,ghostKg){if(failed||!scene)return;state.kg=kg;state.ghostKg=ghostKg??null;if(glbActive()&&glbShown)glbShade();else rebuild();dirty=true;},
-  progressOf,blendOf,
+  setWeight(kg,ghostKg,opt){if(failed||!scene)return;state.ghostKg=ghostKg??null;
+    if(opt&&opt.animate&&glbActive()&&glbShown){playMorph(kg,opt.ms||900);dirty=true;return;}
+    morphAnim=null;state.kg=kg;if(glbActive()&&glbShown)glbShade();else rebuild();dirty=true;},
+  setProgress(p,opt){p=clamp01(+p||0);const kg=state.start-(state.start-state.goal)*p;this.setWeight(kg,state.ghostKg,opt);},
+  playPreview(ms){this.setProgress(0);this.setProgress(1,{animate:true,ms:ms||1600});},
+  progressOf,blendOf,easeInOut,get morphReady(){return !!glb.morphReady;},get stageCount(){return (glb.stages||[]).length;},get visibleStage(){return glb.shown?glb.shown.p:null;},
   get mode(){return readMode();},get glbStatus(){return glb.status;},
   setMode(m){try{localStorage.setItem(MODE_KEY,m==='proc'?'proc':'glb');}catch(e){}if(!failed&&scene){if(m!=='proc')swayBase=0;rebuild();}},
   setIdle(v){idleSpeed=v;dirty=true;},

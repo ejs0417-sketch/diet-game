@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.14 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색)
-const VERSION='0.4.14', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.15 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색)
+const VERSION='0.4.15', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
@@ -222,9 +222,48 @@ function importCsv(file){const fr=new FileReader();fr.onload=()=>{const t=parseC
 // ---------- UI ----------
 const $=s=>document.querySelector(s);
 function toast(m){const t=$('#toast');if(!t)return;t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',2200);}
-function add(e){const before=compute().total;raw.push(withId(e));save();const C=compute(),g=C.total-before;
+let pendingFx=null,qTab='today';
+function todayXp(C){return (C.rows||[]).filter(r=>r.date===C.today).reduce((s,r)=>s+(+r.xp||0),0);}
+function displayName(){return (settings.displayName||settings.name||'준석');}
+function skipState(){
+  const s=settings.qSkip&&settings.qSkip.date===today()?settings.qSkip:{date:today(),ids:[]};
+  settings.qSkip=s;return s;
+}
+function skipQuest(id,ev){if(ev){ev.preventDefault();ev.stopPropagation();}
+  const s=skipState();if(!s.ids.includes(id))s.ids.push(id);saveSettings();render();}
+function unskipQuest(id,ev){if(ev){ev.preventDefault();ev.stopPropagation();}
+  const s=skipState();s.ids=s.ids.filter(x=>x!==id);saveSettings();render();}
+function playPendingFx(){
+  const fx=pendingFx;pendingFx=null;if(!fx)return;
+  if(fx.xp>0){
+    const hero=document.getElementById('heroCard');if(hero)hero.classList.add('flash');
+    const el=document.createElement('div');el.className='xp-float';el.textContent='+'+fx.xp+' XP';document.body.appendChild(el);
+    setTimeout(()=>el.remove(),1200);
+    const n=document.getElementById('todayXpNum');
+    if(n){const to=fx.todayXp||0,from=Math.max(0,to-fx.xp);let t0=performance.now();
+      const step=now=>{const u=Math.min(1,(now-t0)/600),e=1-Math.pow(1-u,3);n.textContent=Math.round(from+(to-from)*e).toLocaleString('ko-KR');if(u<1)requestAnimationFrame(step);};
+      n.textContent=from.toLocaleString('ko-KR');requestAnimationFrame(step);}
+  }
+  if(fx.levelUp||(fx.xp>=20&&fx.fire)){
+    const b=document.createElement('div');b.className='fire-burst';b.textContent='🔥';document.body.appendChild(b);
+    setTimeout(()=>b.remove(),1000);
+  }
+  if(fx.ach&&fx.ach.length){
+    const a=fx.ach[0];
+    const pop=document.createElement('div');pop.className='ach-popup';pop.setAttribute('role','dialog');
+    pop.innerHTML=`<div class="card"><div class="ico">${a.ico||'🏆'}</div><h3>업적 달성</h3><div style="font-size:18px;font-weight:800;color:#fff;margin:8px 0">${esc(a.name)}</div><div class="muted">${esc(a.desc||'')}</div><div class="num-i" style="color:var(--mint-400);font-size:22px;margin:10px 0">+${a.xp||0} XP</div><button type="button" class="btn-primary" style="width:100%" onclick="this.closest('.ach-popup').remove()">확인</button></div>`;
+    pop.addEventListener('click',e=>{if(e.target===pop)pop.remove();});
+    document.body.appendChild(pop);
+  }
+}
+function add(e){const before=compute();raw.push(withId(e));save();const C=compute(),g=C.total-before.total;
  if(e&&e.type==='meal')wantMealSearchFocus=true;
- toast(g>0?`+${g} XP 획득!`+(Math.floor(C.total/100)>Math.floor(before/100)?' 🎉 레벨업!':''):'기록했어요');render();}
+ const newAch=Object.keys(C.got||{}).filter(k=>!(before.got||{})[k]).map(k=>{
+   const def=(typeof ACH!=='undefined'?ACH:[]).find(x=>x[0]===k);
+   return {name:k,desc:def?def[1]:'',xp:def?def[2]:0,ico:def?def[3]:'🏆'};
+ });
+ pendingFx={xp:g,todayXp:todayXp(C),levelUp:Math.floor(C.total/100)>Math.floor(before.total/100),ach:newAch,fire:!!(e&&(e.type==='exercise'||e.type==='meal_close'))};
+ toast(g>0?`+${g} XP 획득!`+(pendingFx.levelUp?' 🎉 레벨업!':''):'기록했어요');render();}
 function del(id){if(!confirm('이 기록을 지울까요?'))return;raw=raw.filter(e=>e.id!==id);save();render();}
 const NAV=[['home','🏠','홈'],['quest','📋','퀘스트'],['log','📊','기록'],['ach','🛡️','업적'],['me','👤','내정보']];
 const QICBG={'⚖️':'var(--mint-50)','🍱':'#FFF4E5','👟':'#EAF0FF','💧':'#E6F6FF','💪':'#FFEDEB','📉':'#EAF0FF','🔥':'#FFF0E2'};
@@ -233,50 +272,109 @@ function render(){migrateVitaminsOnce();const C=compute();
  $('#nav').innerHTML=NAV.map(([k,i,l])=>`<button type="button" ${tab===k?'aria-current="page"':''} onclick="tab='${k}';render()"><span class="ti">${i}</span>${l}</button>`).join('');
  if(tab!=='me'){pvKg=null;meBase=null;}
  $('#view').innerHTML=({home,quest,log,ach,me})[tab](C);
- window.scrollTo(0,0);if(window.dgMountAvatar)window.dgMountAvatar();restoreMealSearchFocus();}
-function topBar(C){const p=C.total%100;
- return `<header class="hud-wrap"><div class="hud">
-  <div class="level-badge"><div><small>LV</small><b>${C.level}</b></div></div>
-  <div class="hud-mid"><div class="hud-line"><b>Lv.${C.level}</b><span>다음 레벨까지 <b class="num" style="font-size:13px;color:#fff">${100-p}</b> XP</span></div>
-  <div class="xp-bar"><i style="width:${p}%"></i></div>
-  <div class="xp-meta"><span><span class="num">${p}</span> / 100 XP</span><span>누적 <span class="num">${C.total}</span> XP</span></div></div>
-  <div class="hud-right">${versionBadge()}<span class="stat-chip glass">🪙 <span class="num">${C.coins}</span></span><span class="stat-chip glass">🔥 <span class="num">${C.streak}</span>일</span></div>
- </div></header>`;}
-function questDefs(C){const t=C.days[C.today];const meals=MEALS.filter(m=>t.meals[m]).length;return [
- {ic:'⚖️',t:'아침 공복 체중',s:'하루 한 번, 일어나서 바로',p:t.weight!==null?1:0,max:1,lab:t.weight!==null?t.weight+'kg':'0 / 1',xp:10,done:t.weight!==null},
- {ic:'🍱',t:'식사 기록하고 마감',s:t.closed?`마감 완료 · ${t.kcal}kcal · 단백질 ${t.prot}g`:`${t.mealCount}끼 기록 · 다 먹으면 마감`,p:t.closed?1:0,max:1,lab:t.closed?'마감':'미마감',xp:20,done:t.closed&&t.mealCount>0},
- {ic:'👟',t:'걷기 40~60분',s:t.rest?'오늘은 통증 휴식':'관절에 무리 없이',p:t.rest?60:Math.min(t.walk,60),max:40,lab:t.rest?'휴식':`${t.walk} / 40~60분`,xp:40,done:t.walk>=40||t.rest},
- {ic:'💧',t:'물 2L 마시기',s:'틈틈이 나눠서',p:t.water,max:2,lab:`${t.water} / 2L`,xp:5,done:t.water>=2}];}
-function qCard(q,bar){const pct=Math.min(100,q.max?q.p/q.max*100:0);const barCls=bar||(q.done?'':'coral');
- const go=q.t==='식사 기록하고 마감'?"tab='log';logKind='meal';mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"
+ window.scrollTo(0,0);if(window.dgMountAvatar)window.dgMountAvatar();restoreMealSearchFocus();playPendingFx();}
+function topBar(C,mode){const xp=todayXp(C);
+ return `<header class="top-xp"><button type="button" class="menu-btn" aria-label="내정보" onclick="tab='me';render()">☰</button>
+  <div class="xp-title">${mode==='xp'||!mode?'오늘 XP':esc(mode)} <span class="num-i" id="todayXpNum">${xp.toLocaleString('ko-KR')}</span> ${versionBadge()}</div>
+  <div class="gem" title="보유 XP">💎 <span class="num-i">${C.coins}</span></div>
+ </header>`;}
+function heroStats(C){
+  const t=C.days[C.today]||{},w=week(C.today),sc=C.strW[w]||0;
+  const clamp=n=>Math.max(0,Math.min(100,Math.round(n)));
+  return [
+    ['체력','♥',clamp(((Math.min(t.walk||0,60)/40)*70)+((Math.min(t.water||0,2)/2)*30)+(t.rest?20:0)),'hp'],
+    ['식단','✦',clamp(((Math.min(t.mealCount||0,3)/3)*60)+((t.kcal>0&&t.kcal<=1800)?25:(t.kcal>0?10:0))+Math.min(15,(t.prot||0)/130*15)),'diet'],
+    ['근력','⚔',clamp((sc/3)*100+(t.strength?15:0)),'str'],
+    ['꾸준함','🔥',clamp(Math.min(C.streak||0,7)/7*100),'habit']
+  ];
+}
+function blockBar(pct){const f=Math.round(Math.max(0,Math.min(100,pct))/10);return `<div class="block-bar">${Array.from({length:10},(_,i)=>`<i class="${i<f?'on':''}"></i>`).join('')}</div>`;}
+function questDefs(C){const t=C.days[C.today];const meals=MEALS.filter(m=>t.meals[m]).length;
+ const hwToday=raw.some(e=>e.date===C.today&&e.type==='exercise'&&e.item==='근력');
+ const st=window.DGWorkout&&DGWorkout.state&&DGWorkout.state();
+ const hwName=st?('홈트 '+st.stage+'단계'):'홈트 한 세트';
+ return [
+ {id:'weight',ic:'⚖️',t:'아침 공복 체중',s:'하루 한 번, 일어나서 바로',tags:['매일','쉬움'],p:t.weight!==null?1:0,max:1,lab:t.weight!==null?t.weight+'kg':'0 / 1',xp:10,done:t.weight!==null,go:"tab='log';logKind='weight';render();"},
+ {id:'meals',ic:'🍱',t:'끼니 기록하기',s:`${meals}끼 기록`,tags:['매일','쉬움'],p:meals,max:3,lab:meals+' / 3',xp:5,done:meals>=3,go:"tab='log';logKind='meal';mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"},
+ {id:'close',ic:'🧾',t:'식사 기록하고 마감',s:t.closed?`마감 완료 · ${t.kcal}kcal · 단백질 ${t.prot}g`:`${t.mealCount}끼 기록 · 다 먹으면 마감`,tags:['매일','식단'],p:t.closed?1:0,max:1,lab:t.closed?'마감':'미마감',xp:20,done:t.closed&&t.mealCount>0,go:"tab='log';logKind='meal';mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"},
+ {id:'hw',ic:'💪',t:hwName,s:'장비 없이 단계 코칭',tags:['매일','홈트'],p:hwToday?1:0,max:1,lab:hwToday?'완료':'미완료',xp:15,done:!!hwToday,go:"if(window.DGWorkout)DGWorkout.open();"},
+ {id:'kcal',ic:'🔥',t:'오늘 섭취 1,800kcal 이하',s:`지금 ${Math.round(t.kcal||0)}kcal`,tags:['매일','식단'],p:Math.min(t.kcal||0,1800),max:1800,lab:`${Math.round(t.kcal||0)} / 1,800kcal`,xp:20,done:!!(t.closed&&t.kcal<=1800&&t.mealCount>0),go:"const el=document.getElementById('dinnerCard');if(el)el.scrollIntoView({block:'start'});else{tab='log';logKind='meal';mealKind='저녁';render();setTimeout(revealMealSearch,50);}"},
+ {id:'walk',ic:'👟',t:'걷기 40~60분',s:t.rest?'오늘은 통증 휴식':'관절에 무리 없이',tags:['매일','운동'],p:t.rest?60:Math.min(t.walk,60),max:40,lab:t.rest?'휴식':`${t.walk} / 40~60분`,xp:40,done:t.walk>=40||t.rest,go:"tab='log';logKind='exercise';render();"},
+ {id:'water',ic:'💧',t:'물 2L 마시기',s:'틈틈이 나눠서',tags:['매일','쉬움'],p:t.water,max:2,lab:`${t.water} / 2L`,xp:5,done:t.water>=2,go:"tab='log';logKind='water';render();"}];}
+function qGo(q){return q.go||(q.t==='식사 기록하고 마감'?"tab='log';logKind='meal';mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"
   :q.t==='아침 공복 체중'?"tab='log';logKind='weight';render();"
   :q.t==='걷기 40~60분'?"tab='log';logKind='exercise';render();"
   :q.t==='물 2L 마시기'?"tab='log';logKind='water';render();"
-  :'';
- return `<div class="quest-card${q.done?' done':''}${q.locked?' locked':''}"${go?` role="button" onclick="${go}"`:''}><div class="q-ic" style="background:${QICBG[q.ic]||'var(--mint-50)'}">${q.ic}</div><div class="q-body">
-  <div class="q-title">${q.t}</div><div class="q-sub">${q.s}</div>
-  <div class="q-prog"><div class="xp-bar on-light ${barCls}"><i style="width:${pct}%"></i></div><span>${q.lab}</span></div>
- </div><div class="q-reward">${q.done?'✓<small>완료</small>':`+${q.xp}<small>XP</small>`}</div></div>`;}
+  :'');}
+function qCard(q,bar){
+ const go=qGo(q);const tags=(q.tags||[]).concat([q.lab||'']).filter(Boolean);
+ const skipped=q.id&&skipState().ids.includes(q.id);
+ const extra=q._extra||'';
+ return `<div class="quest-card${q.done?' done':''}${q.locked?' locked':''}${skipped?' skipped':''}"${go?` role="button" onclick="${go}"`:''}><div class="q-ic">${q.ic}</div><div class="q-body">
+  <div class="q-title">${q.t}</div>
+  <div class="q-tags">${tags.map(x=>`<span class="q-tag">${esc(String(x))}</span>`).join('')}</div>${extra}
+ </div>
+ <button type="button" class="q-check" aria-label="${q.done?'완료':(skipped?'건너뜀':'이동')}" onclick="event.stopPropagation();${q.done||skipped?'':'('+qGo(q)+')'}"></button></div>`;}
+function questPills(qs){
+  const skip=skipState().ids;
+  const todayN=qs.filter(q=>!q.done&&!skip.includes(q.id)).length;
+  const doneN=qs.filter(q=>q.done).length;
+  const skipN=qs.filter(q=>!q.done&&skip.includes(q.id)).length;
+  const lab=[['today','오늘 퀘스트 '+todayN],['done','완료'+(doneN?(' '+doneN):'')],['skipped','건너뜀'+(skipN?(' '+skipN):'')]];
+  return `<div class="q-pills">${lab.map(([k,l],i)=>`${i===1?'<span class="div"></span>':''}<button type="button" aria-selected="${qTab===k?'true':'false'}" onclick="qTab='${k}';render()">${l}</button>`).join('')}</div>`;
+}
+function questList(qs,opt){
+  opt=opt||{};const skip=skipState().ids;
+  let list=qs;
+  if(qTab==='done')list=qs.filter(q=>q.done);
+  else if(qTab==='skipped')list=qs.filter(q=>!q.done&&skip.includes(q.id));
+  else list=qs.filter(q=>!q.done&&!skip.includes(q.id));
+  if(!list.length)return `<div class="muted" style="text-align:center;padding:18px 8px">${qTab==='done'?'완료한 퀘스트가 아직 없어요.':qTab==='skipped'?'건너뛴 퀘스트가 없어요.':'오늘 할 일이 모두 비었어요.'}</div>`;
+  return list.map(q=>{
+    const copy=Object.assign({},q);
+    if(opt.home&&qTab==='today'&&q.id&&!q.done)
+      copy._extra=`<button type="button" class="btn-ghost btn-sm" style="min-height:32px;padding:0 6px;font-size:11px" onclick="skipQuest('${q.id}',event)">건너뛰기</button>`;
+    if(qTab==='skipped'&&q.id)
+      copy._extra=`<button type="button" class="btn-ghost btn-sm" style="min-height:32px;padding:0 6px;font-size:11px" onclick="unskipQuest('${q.id}',event)">되돌리기</button>`;
+    return qCard(copy);
+  }).join('');
+}
 function warnBanner(C){let h='';const t=C.days[C.today],y=C.days[ds(dn(C.today)-1)];
  if(t.warn)h+=`<div class="banner warn">⚠️ 오늘은 1,600kcal 미만이라 식단 점수를 드리지 않았어요. 굶기 보상은 없어요.</div>`;
  else if(y&&y.warn)h+=`<div class="banner warn">⚠️ 어제는 1,600kcal 미만이라 식단 점수를 드리지 않았어요. 굶기 보상은 없어요.</div>`;
  if(C.boss){const live=C.today>=C.boss.start;h+=`<div class="banner boss" onclick="tab='quest';render()">🐉 정체기 보스 ${live?'등장! ~'+C.boss.end.slice(5):'예고: '+C.boss.start.slice(5)+' 시작'} · 퀘스트에서 확인</div>`;}
  else if(C.flatWeeks===1)h+=`<div class="banner flat">지난주 평균이 줄지 않았어요. 1주 정체는 흔해요. 이번 주도 그대로 꾸준히!</div>`;
  return h;}
-function home(C){const qs=questDefs(C),show=qs.filter(q=>!q.done).slice(0,3);while(show.length<3&&show.length<qs.length)show.push(qs.find(q=>!show.includes(q)));
- const all=qs.every(q=>q.done);
- const lost=Math.max(0,START_W-C.weight),need=Math.max(0.1,START_W-settings.goal),lpct=Math.min(100,lost/need*100);
- return topBar(C)+`<div class="page">`+warnBanner(C)+`<section class="hero"><div class="avatar-frame" id="avatarSlot" data-kg="${C.avatarW.toFixed(2)}" data-ghost="${C.pred.toFixed(2)}" data-idle="0.35"><img class="fallback" src="char.png" alt="캐릭터"><div class="pedestal"></div><div class="avcap">주간 평균 ${C.avatarW.toFixed(1)}kg 체형${C.pred<=C.avatarW-0.1?' · 연두=예측':''}</div></div>
- <div class="wcard" onclick="tab='log';render()"><div class="lbl">⚖️ 현재 체중</div><div class="big num">${C.weight.toFixed(1)}<small>kg</small></div>
- <div><div class="kv"><span>🎯 목표</span><b>${settings.goal}kg</b></div><div class="xp-bar on-light gold" style="height:8px;margin:5px 0 3px"><i style="width:${lpct}%"></i></div><div class="kv"><span>감량</span><b>${lost.toFixed(1)} / ${need.toFixed(1)}kg</b></div></div>
- <div class="kv"><span>이번 달 목표</span><b>${settings.month}kg</b></div>
- <div class="kv"><span>📈 예측</span><b>${predRange(C)}</b></div>
- <div class="muted" style="font-size:11px;line-height:14px;margin-top:-6px;text-align:right">건강관리 확인됨</div>
- ${C.next?`<div class="next-stage" style="flex-direction:column;align-items:stretch;gap:2px"><div style="display:flex;justify-content:space-between"><span>다음 단계</span><span>+${C.next[1]} XP</span></div><div style="color:var(--ink-900);font-size:14px"><span class="num">${C.next[0]}kg</span> ${C.next[2]}</div></div>`:''}</div></section>
- <div class="section-title"><h2>오늘의 퀘스트 ⭐</h2><a class="link" onclick="tab='quest';render()">${all?'모두 완료! +20 XP':'모두 완료하면 +20 XP'} ›</a></div>
- ${show.map(q=>qCard(q)).join('')}
- ${(window.DGCoach?DGCoach.card(C,{lastMeal:window._dgLastMealLog}):'')}
- <div class="card" style="margin-top:4px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">빠른 기록</h3><span class="stat-chip flame">🔥 스트릭 <span class="num">${C.streak}</span>일</span></div>
+function bodyKgOf(C){
+  if(window.DGGuide&&DGGuide.forecastTrail){
+    const tr=DGGuide.forecastTrail({C,days:C.days,today:C.today});
+    if(tr&&tr.ok&&tr.bodyKg>0)return tr.bodyKg;
+  }
+  return C.avatarW;
+}
+function forecastLine(C){return '';}
+function home(C){const qs=questDefs(C);
+ const p=C.total%100,need=100-p;
+ const stats=heroStats(C);
+ return topBar(C,'xp')+`<div class="page">`+warnBanner(C)+`
+ <section class="hero-card" id="heroCard">
+  <div class="hero-left">
+    <div class="hero-name">${esc(displayName())}</div>
+    <div class="hero-lv"><small>LV</small>${C.level}</div>
+    <div class="xp-bar"><i style="width:${p}%"></i></div>
+    <div class="hero-xpmeta">레벨 ${C.level+1}까지 ${need} XP</div>
+    <div class="mini-stats">${stats.map(([n,ic,v,k])=>`<div class="mini-stat ${k}"><span>${ic} ${n}</span><div class="bar"><i style="width:${v}%"></i></div></div>`).join('')}</div>
+  </div>
+  <div class="hero-avatar avatar-frame" id="avatarSlot" data-kg="${bodyKgOf(C).toFixed(2)}" data-idle="0.25"><img class="fallback" src="char.png" alt="캐릭터"><div class="pedestal"></div><div class="avcap">누적 예상 ${bodyKgOf(C).toFixed(1)}kg</div></div>
+ </section>
+ ${questPills(qs)}
+ ${questList(qs,{home:true})}
+ ${(window.DGGuide?DGGuide.forecastHTML(C):'')}
+ ${(window.DGGuide?DGGuide.coachHTML(C):'')}
+ ${(window.DGGuide?DGGuide.dinnerHTML(C):'')}
+ ${(window.DGGuide&&DGGuide.nextDayHTML)?DGGuide.nextDayHTML(C):''}
+ ${(window.DGWorkout?DGWorkout.cardHTML(C):'')}
+ <div class="card" style="margin-top:4px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">빠른 기록</h3><span class="stat-chip flame">🔥 스트릭 <span class="num-i">${C.streak}</span>일</span></div>
  <div class="quick">${quick()}</div>${vitButtons(today())}
  ${(window.DGDelivery?`<div style="margin-top:8px"><button type="button" class="btn-secondary" style="width:100%" onclick="DGDelivery.pick()">📷 배달 주문 사진으로 기록</button>${DGDelivery.chipsHTML(C)}</div>`:'')}
  </div>
@@ -361,8 +459,12 @@ function setMealKind(k){mealKind=k;
 function quest(C){const qs=questDefs(C),w=week(C.today),sc=C.strW[w]||0;
  const wk=raw.filter(e=>e.type==='weight'&&week(e.date)===w);
  const doneN=qs.filter(q=>q.done).length;
- return topBar(C)+`<div class="page">
- <div class="section-title" style="margin-top:4px"><h2>일일 퀘스트</h2><span class="stat-chip mint">${doneN} / ${qs.length} 완료</span></div>
+ const stats=heroStats(C);
+ return topBar(C,'퀘스트')+`<div class="page">
+ <div class="card"><h3>오늘 스탯</h3><div class="stat-panel">${stats.map(([n,ic,v])=>`<div class="row"><span>${ic} ${n}</span>${blockBar(v)}<span class="num-i">${v}</span></div>`).join('')}</div></div>
+ ${questPills(qs)}
+ ${questList(qs)}
+ <div class="section-title" style="margin-top:12px"><h2>일일 퀘스트</h2><span class="stat-chip mint">${doneN} / ${qs.length} 완료</span></div>
  ${qs.map(q=>qCard(q)).join('')}
  <div class="card card-dark" style="display:flex;align-items:center;gap:12px"><div style="font-size:28px">🎁</div><div style="flex:1"><b style="font-size:15px;color:#fff">4개 모두 완료 보너스</b><div style="font-size:13px;color:#C3C8EE">일일 퀘스트를 다 끝내면 지급</div></div><div class="stat-chip gold"><span class="num">+20</span> XP</div></div>
  <button type="button" class="btn-secondary btn-block" onclick="add({date:today(),type:'rest',item:'휴식',value:prompt('휴식 이유','통증')||'통증',note:''})">🩹 통증 휴식으로 기록</button>
@@ -397,8 +499,8 @@ function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0
    <button type="button" class="btn-primary btn-lg" onclick="sub('weight')">체중 기록 <span class="stat-chip gold" style="min-height:26px;padding:0 8px;font-size:12px;box-shadow:none">+10 XP</span></button>`,
   meal:`<div id="mealSearchDock" class="meal-search-dock${mealsForSlot(T, mealKind).length?' compact':''}">
    <div class="label" style="font-size:13px;font-weight:700;margin-bottom:6px">끼니</div>
-   <div class="segmented meal-slots" data-seg="meal" style="margin-bottom:8px;background:#F3F5FB" role="tablist">${meals.map(m=>`<button type="button" data-k="${m}" aria-selected="${mealKind===m}" onclick="setMealKind('${m}')">${m}</button>`).join('')}</div>
-   <div class="segmented meal-place" data-seg="place" style="margin-bottom:8px;background:#F3F5FB" role="tablist" aria-label="식사 방식">${MEAL_PLACES.map(([k,i,l])=>`<button type="button" data-k="${k}" aria-selected="${mealPlace===k}" onclick="setMealPlace('${k}')">${i} ${l}</button>`).join('')}</div>
+   <div class="segmented meal-slots" data-seg="meal" style="margin-bottom:8px;background:var(--surface-2)" role="tablist">${meals.map(m=>`<button type="button" data-k="${m}" aria-selected="${mealKind===m}" onclick="setMealKind('${m}')">${m}</button>`).join('')}</div>
+   <div class="segmented meal-place" data-seg="place" style="margin-bottom:8px;background:var(--surface-2)" role="tablist" aria-label="식사 방식">${MEAL_PLACES.map(([k,i,l])=>`<button type="button" data-k="${k}" aria-selected="${mealPlace===k}" onclick="setMealPlace('${k}')">${i} ${l}</button>`).join('')}</div>
    <label class="field" style="margin-bottom:8px"><span class="label">메뉴 검색</span><input class="input" id="mealMenu" placeholder="짜장면, 치킨, 초성 ㄱㅊㅉㄱ" autocomplete="off" enterkeyhint="search" oninput="if(window.DGFoodSearch)DGFoodSearch.render(this.value)"></label>
    <div id="mealSearchBox" class="meal-search">${(window.DGFoodSearch?DGFoodSearch.emptyHTML():'')}</div>
    </div>
@@ -410,7 +512,9 @@ function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0
    ${(window.DGDelivery?DGDelivery.chipsHTML(C):'')}`,
   exercise:`<div class="segmented" data-seg="ex" style="margin-bottom:12px" role="tablist"><button type="button" data-k="걷기" aria-selected="true" onclick="this.parentNode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-selected',b===this));this.parentNode.dataset.v='걷기'">걷기</button><button type="button" data-k="근력" aria-selected="false" onclick="this.parentNode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-selected',b===this));this.parentNode.dataset.v='근력'">근력</button></div>
    <label class="field" style="margin-bottom:14px"><span class="label">시간(분)</span><input class="input" id="min" type="number" placeholder="예: 40" inputmode="numeric"></label>
-   <button type="button" class="btn-primary btn-lg" onclick="sub('exercise')">운동 기록하기</button>`,
+   <button type="button" class="btn-primary btn-lg" onclick="sub('exercise')">운동 기록하기</button>
+   <button type="button" class="btn-secondary" style="width:100%;margin-top:8px" onclick="if(window.DGWorkout)DGWorkout.open()">🏠 홈트로 단계 코칭 받기</button>
+   <div class="muted" style="margin-top:8px;font-size:12px">장비 없이 스쿼트·푸시업·플랭크·런지를 단계별로 따라 할 수 있어요. 완료하면 근력으로 기록돼요.</div>`,
   water:`<label class="field" style="margin-bottom:14px"><span class="label">물 (L)</span><input class="input" id="wat" type="number" step="0.1" placeholder="예: 0.5" inputmode="decimal"></label>
    <button type="button" class="btn-primary btn-lg" onclick="sub('water')">물 기록하기</button>`
  };
@@ -467,7 +571,7 @@ function stageSVG(sh){const id='sg'+sh.kg;return `<svg width="57" height="92" vi
  <rect x="${(62-sh.legW-2).toFixed(1)}" y="128" width="${sh.legW}" height="58" rx="8" fill="url(#${id})"/>
  <rect x="64.0" y="128" width="${sh.legW}" height="58" rx="8" fill="url(#${id})"/>
 </svg>`;}
-function stageRow(C){const cur=C.avatarW;let near=STAGE_SHAPES[0];
+function stageRow(C){const cur=bodyKgOf(C);let near=STAGE_SHAPES[0];
  for(const sh of STAGE_SHAPES){if(Math.abs(sh.kg-cur)<=Math.abs(near.kg-cur))near=sh;}
  return `<div class="section-title" style="margin-top:4px"><h2>체형 변화 단계</h2><span class="muted">미리보기</span></div>
  <div class="stage-row">${STAGE_SHAPES.map(sh=>{const on=sh===near,delta=+(START_W-sh.kg).toFixed(1);
@@ -476,7 +580,7 @@ function stageRow(C){const cur=C.avatarW;let near=STAGE_SHAPES[0];
 function ach(C){const icons=['👣','🎯','📉','💯','🏆','💚'];
  const nStage=C.nStage,nGot=Object.keys(C.got).length;
  const nextI=LADDER.findIndex((_,i)=>!C.stages[i]);
- return topBar(C)+`<div class="page">${stageRow(C)}
+ return topBar(C,'업적')+`<div class="page">${stageRow(C)}
  <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><h3 style="margin:0">단계 목표</h3><span class="stat-chip mint">${nStage} / ${LADDER.length}</span></div>
  <div class="muted" style="margin-bottom:14px">주간 평균(3일 이상 기록)으로 판정해요. 기한은 2단계만. 95·86kg은 확정 대기.</div>
  ${LADDER.map(([kg,xp,t],i)=>{const done=!!C.stages[i],cur=i===nextI;
@@ -488,14 +592,21 @@ function ach(C){const icons=['👣','🎯','📉','💯','🏆','💚'];
    </div>
    <div style="flex:1;padding:2px 0 14px;min-width:0"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b style="color:var(--ink-900);font-size:15px">${i+1}단계 ${t}</b><span class="stat-chip ${done||cur?'gold':''}" style="min-height:26px;font-size:12px;box-shadow:${done||cur?'none':'inset 0 0 0 1px var(--line)'}">+${xp} XP</span></div>
    <div class="muted">${kg}kg 이하${i===1?' · 2026-12-10까지':''}${wait}${done?' · '+C.stages[i].slice(5)+' 달성':''}</div>
-   ${cur&&!done?`<div style="margin-top:6px"><div class="xp-bar on-light gold" style="height:8px"><i style="width:${Math.min(100,Math.max(0,(START_W-C.avatarW)/(START_W-kg)*100))}%"></i></div><div class="muted" style="font-size:12px;margin-top:3px">다음 목표 · 주간 평균 ${C.avatarW.toFixed(1)}kg → ${kg}kg</div></div>`:''}
+   ${cur&&!done?`<div style="margin-top:6px"><div class="xp-bar on-light gold" style="height:8px"><i style="width:${Math.min(100,Math.max(0,(START_W-C.avatarW)/(START_W-kg)*100))}%"></i></div><div class="muted" style="font-size:12px;margin-top:3px">다음 목표 · 누적 예상 ${bodyKgOf(C).toFixed(1)}kg → ${kg}kg</div></div>`:''}
   </div></div>`;}).join('')}
  </div>
  <div class="section-title"><h2>업적</h2><span class="stat-chip gold">${nGot} / ${ACH.length}</span></div>
  <div class="ach-grid">${ACH.map(a=>{const on=!!C.got[a[0]];
-  return `<div class="ach-badge${on?' on':''}"><div class="ico">${a[3]}</div><div class="nm">${a[0]}</div><div class="ds">${a[1]}</div><div class="xp">${on?C.got[a[0]].slice(5).replace('-','/')+' 달성 · +'+a[2]:'+'+a[2]+' XP'}</div></div>`;}).join('')}</div>
+  return `<div class="ach-badge${on?' on':''}"><div class="ico">${on?a[3]:'?'}</div><div class="nm">${on?a[0]:'???'}</div><div class="ds">${on?a[1]:'아직 숨겨져 있어요'}</div><div class="xp">${on?C.got[a[0]].slice(5).replace('-','/')+' 달성 · +'+a[2]:'+'+a[2]+' XP'}</div></div>`;}).join('')}</div>
  </div>`;}
-function me(C){return topBar(C)+`<div class="page">`+(window.DGAuth?DGAuth.accountCard():'')+makeMe(C)+infoCard(C)+vitCard()+(window.DGHealth?DGHealth.summaryCard():'')+backupCard()+(window.DGAuth?DGAuth.accountActions():'')+`<div class="muted" style="text-align:center;padding:4px 0 8px">다이어트 게임 ${VERSION} · 기획서 v3 규칙</div></div>`;}
+function me(C){return topBar(C,'내정보')+`<div class="page">`+(window.DGAuth?DGAuth.accountCard():'')+makeMe(C)+infoCard(C)+vitCard()+(window.DGHealth?DGHealth.summaryCard():'')+backupCard()+(window.DGAuth?DGAuth.accountActions():'')+`<div class="muted" style="text-align:center;padding:4px 0 8px">다이어트 게임 ${VERSION} · 기획서 v3 규칙</div></div>`;}
+function saveTdeeProfile(){
+  const h=+$('#pH').value,b=$('#pB').value,s=$('#pS').value,a=+$('#pA').value;
+  if(!(h>=100&&h<=250))return toast('키를 확인해 주세요');
+  if(!b)return toast('생년월일을 적어 주세요');
+  settings.heightCm=h;settings.birth=b;settings.sex=s||'m';settings.activity=a||ACT;
+  saveSettings();toast('프로필을 저장했어요');render();
+}
 function infoCard(C){return `<div class="card"><h3>내 정보</h3>
  <div class="grid2" style="margin-bottom:12px">
   <div class="stat-tile"><div class="t">시작 · ${START_DATE.slice(5).replace('-','/')}</div><div class="v">${START_W.toFixed(1)}<small> kg</small></div></div>
@@ -503,7 +614,14 @@ function infoCard(C){return `<div class="card"><h3>내 정보</h3>
   <div class="stat-tile"><div class="t">이번 달 목표 (~12/10)</div><div class="v">${settings.month}<small> kg</small></div></div>
   <div class="stat-tile"><div class="t">장기 목표</div><div class="v">${settings.goal}<small> kg</small></div></div></div>
  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px"><span class="stat-chip mint">Lv.<span class="num">${C.level}</span></span><span class="stat-chip mint">누적 <span class="num">${C.total}</span> XP</span><span class="stat-chip gold">🪙 <span class="num">${C.coins}</span></span><span class="stat-chip flame">🔥 <span class="num">${C.streak}</span>일</span></div>
- <div class="rowx"><input class="input" id="goal" type="number" step="0.5" value="${settings.goal}"><button type="button" class="btn-primary" onclick="settings.goal=+$('#goal').value;saveSettings();render()">장기 목표 저장</button></div></div>`;}
+ <div class="rowx"><input class="input" id="goal" type="number" step="0.5" value="${settings.goal}"><button type="button" class="btn-primary" onclick="settings.goal=+$('#goal').value;saveSettings();render()">장기 목표 저장</button></div>
+ <div class="muted" style="margin:14px 0 8px">예상 체중(TDEE)에 쓰는 프로필</div>
+ <div class="rowx" style="margin-bottom:8px"><label class="field"><span class="label">키(cm)</span><input class="input" id="pH" type="number" step="0.1" value="${settings.heightCm||HEIGHT}" inputmode="decimal"></label>
+ <label class="field"><span class="label">생년월일</span><input class="input" id="pB" type="date" value="${settings.birth||BIRTH}"></label></div>
+ <div class="rowx" style="margin-bottom:8px"><label class="field"><span class="label">성별</span><select class="input" id="pS"><option value="m" ${((settings.sex||'m')==='m')?'selected':''}>남성</option><option value="f" ${settings.sex==='f'?'selected':''}>여성</option></select></label>
+ <label class="field"><span class="label">활동량</span><select class="input" id="pA">${(window.DGGuide?DGGuide.ACT_OPTS:[[1.2,'거의 앉아서']]).map(([v,l])=>`<option value="${v}" ${(+((settings.activity!=null)?settings.activity:ACT)===v)?'selected':''}>${l} (×${v})</option>`).join('')}</select></label></div>
+ <button type="button" class="btn-secondary" onclick="saveTdeeProfile()">프로필 저장</button>
+ </div>`;}
 function backupCard(){return `<div class="card"><h3>기록 백업</h3><div class="muted" style="margin-bottom:10px">게임 마스터와 같은 log.csv·status.csv 형식이에요.</div>
  <div class="rowx"><button type="button" class="btn-secondary" onclick="exportCsv()">⬇️ 내보내기</button><label class="btn-secondary" style="display:inline-flex;cursor:pointer">⬆️ 가져오기 (log.csv)<input type="file" accept=".csv,text/csv" style="display:none" onchange="importCsv(this.files[0])"></label></div></div>`;}
 function vitCard(){migrateVitaminsOnce();const items=vitList();
@@ -562,10 +680,10 @@ function makeMe(C){const avMode=(window.DGAvatar&&DGAvatar.mode)||'glb';const ba
  <div style="margin:12px 0"><div class="avatar-frame" id="avatarSlot" style="height:330px" data-kg="${v}" data-idle="0.25"><img class="fallback" src="char.png" alt="캐릭터"><div class="pedestal"></div><div class="avcap" id="pvCap">${pvLabel(base,v)}</div></div></div>
  <div class="rowx" style="margin-bottom:6px"><label class="field"><span class="label">키(cm) 🔒</span><input class="input" type="number" value="${HEIGHT}" disabled></label>
  <label class="field"><span class="label">현재 체중(kg)</span><input class="input" id="meW" type="number" step="0.1" value="${base}" onchange="setBase(this.value)"></label></div>
- <div class="muted" style="margin-bottom:12px">키는 186cm로 고정이고, 체형은 시작 체중에서 목표 체중까지의 진행도에 따라 '지금 체형'에서 '목표 체형'으로 바뀌어요(50%부터 서서히). 홈 아바타는 최근 7일 체중 평균(${C.avatarW.toFixed(1)}kg)을 따라가요.</div>
+ <div class="muted" style="margin-bottom:12px">키는 186cm로 고정이고, 체형은 시작 체중에서 목표 체중까지 진행도에 따라 바뀌어요. 홈 아바타는 마지막 실측 체중에 기록된 섭취·운동의 하루 감량을 더해 매일 조금씩 따라가요(지금 누적 예상 ${bodyKgOf(C).toFixed(1)}kg).</div>
  <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="color:var(--ink-900)">목표 체형 미리보기</b><span class="num" style="font-weight:800;color:var(--coral-600)">${(+v).toFixed(1)}kg</span></div>
  <input class="range" id="pv" type="range" min="${lo}" max="${Math.max(base,lo+1)}" step="0.5" value="${v}" oninput="previewKg(this.value)">
- <div class="rowx" style="margin-bottom:14px"><button type="button" class="btn-secondary btn-sm" onclick="previewKg(${base})">지금 ${base}kg</button><button type="button" class="btn-secondary btn-sm" style="border-color:var(--mint-500);color:var(--mint-700);background:var(--mint-50)" onclick="previewKg(${goal})">목표 ${goal}kg</button><button type="button" class="btn-secondary btn-sm" onclick="previewKg(86)">86kg</button></div>
+ <div class="rowx" style="margin-bottom:14px"><button type="button" class="btn-secondary btn-sm" onclick="previewKg(${base})">지금 ${base}kg</button><button type="button" class="btn-secondary btn-sm" style="border-color:var(--mint-500);color:var(--mint-700);background:var(--mint-50)" onclick="previewKg(${goal},true)">목표 ${goal}kg</button><button type="button" class="btn-secondary btn-sm" onclick="previewKg(86,true)">86kg</button><button type="button" class="btn-ghost btn-sm" onclick="playBodyPreview()">재생</button></div>
  <b style="color:var(--ink-900)">캐릭터 종류</b>
  <div class="look-picks" style="margin:6px 0 12px"><button type="button" class="chip${avMode==='glb'?' on':''}" onclick="setAvatarMode('glb')">내 캐릭터(3D 모델)</button><button type="button" class="chip${avMode==='proc'?' on':''}" onclick="setAvatarMode('proc')">직접 다듬기 캐릭터</button></div>
  <b style="color:var(--ink-900)">사진으로 내 얼굴 모델링</b>
@@ -597,9 +715,10 @@ function setAvatarMode(m){if(!window.DGAvatar)return;DGAvatar.setMode(m);render(
 function useProcAvatar(){if(window.DGAvatar&&DGAvatar.mode!=='proc'){DGAvatar.setMode('proc');toast('직접 다듬기 캐릭터로 바꿨어요');}}
 function tuneFace(key,val){if(!saveFaceStore({[key]:val}))return;useProcAvatar();}
 function pvLabel(base,v){const d=+(base-v).toFixed(1);return d>0?`지금 ${(+base).toFixed(1)}kg → 미리보기 ${(+v).toFixed(1)}kg (−${d.toFixed(1)}kg)`:`지금 ${(+base).toFixed(1)}kg`;}
-function previewKg(v){v=+v;pvKg=v;const base=meBase??+compute().avatarW.toFixed(1);const r=$('#pv');if(r)r.value=v;const c=$('#pvCap');if(c)c.textContent=pvLabel(base,v);
+function previewKg(v,animate){v=+v;pvKg=v;const base=meBase??+compute().avatarW.toFixed(1);const r=$('#pv');if(r)r.value=v;const c=$('#pvCap');if(c)c.textContent=pvLabel(base,v);
  const kgEl=document.querySelector('#makeMe .num[style*="coral"]');if(kgEl)kgEl.textContent=v.toFixed(1)+'kg';
- if(window.DGAvatar)DGAvatar.setWeight(v);}
+ if(window.DGAvatar)DGAvatar.setWeight(v,null,animate?{animate:true,ms:1100}:null);}
+function playBodyPreview(){const goal=settings.goal;if(window.DGAvatar&&DGAvatar.playPreview){const start=START_W;previewKg(start);setTimeout(()=>previewKg(goal,true),80);}else previewKg(settings.goal,true);}
 function setBase(v){v=+v;if(!(v>=40&&v<=250))return;meBase=v;pvKg=v;render();}
 function resetFace(){if(!confirm('캐릭터 얼굴을 기본값으로 되돌릴까요?'))return;
  if(!saveFaceStore(window.DGFace?DGFace.DEFAULTS:{}))return;if(window.DGAvatar)DGAvatar.setMode('glb');toast('기본 캐릭터로 바꿨어요');render();}
