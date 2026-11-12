@@ -1,4 +1,4 @@
-// 다이어트 게임 0.4.21 — 식사 사진 인식. 칼로리는 AI가 만들지 않고 음식 표 공식 값만 씁니다. 끼니는 사진 시각(서울), 배달 결제내역 지원.
+// 다이어트 게임 0.4.22 — 식사 사진 인식. 칼로리는 AI가 만들지 않고 음식 표 공식 값만 씁니다. 끼니는 사진 시각(서울), 배달 결제내역 지원.
 (function(root){
 const PROXY_URL='https://52-79-146-61.sslip.io/recognize';
 const PORTIONS=[{id:'little',label:'조금',mul:0.5},{id:'normal',label:'보통',mul:1},{id:'lots',label:'많이',mul:1.5}];

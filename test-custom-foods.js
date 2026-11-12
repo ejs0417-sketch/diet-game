@@ -1,4 +1,4 @@
-// 0.4.21 인터넷 검색값: 출처 없는 값은 거부, 공식 표 우선, 폰 안에만 저장
+// 0.4.22 인터넷 검색값: 출처 없는 값은 거부, 공식 표 우선, 폰 안에만 저장
 const assert=require('assert');
 const vm=require('vm');
 const fs=require('fs');

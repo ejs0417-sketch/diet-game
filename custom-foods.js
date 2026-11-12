@@ -1,4 +1,4 @@
-// 다이어트 게임 0.4.21 — 인터넷에서 찾은 영양(출처 있는 값만). 폰 안에만 저장하고 공식 음식 표가 우선입니다.
+// 다이어트 게임 0.4.22 — 인터넷에서 찾은 영양(출처 있는 값만). 폰 안에만 저장하고 공식 음식 표가 우선입니다.
 (function(root){
 const LOOKUP_URL='https://52-79-146-61.sslip.io/lookup';
 const CKEY='dg_custom_foods_v1';
