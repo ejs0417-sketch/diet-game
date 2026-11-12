@@ -73,7 +73,7 @@ main#view{padding:0 0 calc(var(--tabbar-h) + 16px + env(safe-area-inset-bottom))
 .ladder-ico{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-size:20px;background:#2A2A2A;filter:grayscale(.6);flex:none}
 .ladder-ico.on{background:var(--grad-gold);filter:none;box-shadow:var(--glow-gold)}
 .ladder-ico.cur{background:var(--grad-gold);filter:none;box-shadow:var(--glow-gold)}
-.toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:var(--ink-900);color:#fff;padding:10px 16px;border-radius:20px;z-index:30;display:none;font-weight:700;box-shadow:var(--sh-3);max-width:90%;text-align:center}
+.toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:var(--ink-900);color:#fff;padding:10px 16px;border-radius:20px;z-index:90;display:none;font-weight:700;box-shadow:var(--sh-3);max-width:90%;text-align:center}
 #gate{display:none;position:fixed;inset:0;z-index:20;overflow:auto}
 #gate.on{display:block}
 body.gate main,body.gate nav{display:none}
@@ -388,3 +388,36 @@ html,body{background:var(--bg);color:var(--ink-700)}
 @media(max-width:400px){
   .register-row .btn-register,.register-row .btn-photo{min-height:46px;font-size:15px}
 }
+
+/* 0.4.18 홈 정리·사진 오류 */
+.tab-bar{grid-template-columns:repeat(6,1fr)}
+.tab-bar button{min-height:52px;font-size:10px;padding:0 2px;gap:0}
+.tab-bar button .ti{font-size:18px;width:36px;height:26px}
+.fuel-card{margin:0 0 12px}
+.fuel-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
+.fuel-nums{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.fuel-nums b{display:block;font-size:28px;line-height:32px;font-weight:800;font-family:var(--font-num);color:var(--mint-700)}
+.fuel-nums span{font-size:12px;color:var(--ink-500)}
+.fuel-remain{color:var(--mint-400)!important}
+.fuel-bars{display:grid;gap:6px;margin-top:10px}
+.fuel-bars .bar{height:8px;border-radius:99px;background:#222;overflow:hidden}
+.fuel-bars .bar i{display:block;height:100%;border-radius:99px;background:var(--mint-400)}
+.fuel-bars .fuel-p i{background:#FFD84D}
+.home-quick{margin-top:8px}
+.photo-meal-err{position:fixed;inset:0;z-index:85;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:24px}
+.photo-meal-err-card{background:var(--surface);color:var(--ink-900);border-radius:16px;padding:22px 18px;max-width:320px;width:100%;box-shadow:var(--sh-1)}
+.photo-meal-err-card b{display:block;font-size:17px;font-weight:800;margin-bottom:8px}
+.photo-meal-err-card p{margin:0 0 16px;font-size:14px;line-height:20px;color:var(--ink-500)}
+
+/* 0.4.18 홈 퀘스트 한 줄·더보기 */
+.q-home-card{padding:10px 12px 12px;margin:0 0 12px}
+.q-home-card .q-pills{margin:0 0 8px}
+.q-home-row{display:grid;grid-template-columns:28px 1fr auto;align-items:center;gap:8px;width:100%;text-align:left;background:#161616;border:1px solid #2A2A2A;border-radius:12px;padding:8px 10px;margin:0 0 6px;color:var(--ink-900);font:inherit;min-height:44px}
+.q-home-row .qi{font-size:18px;text-align:center}
+.q-home-row .qn{font-weight:700;font-size:14px}
+.home-more{margin-top:10px;border-top:1px solid #2A2A2A;padding-top:8px}
+.home-more summary{cursor:pointer;color:var(--ink-500);font-size:13px;font-weight:700;list-style:none;padding:6px 0}
+.home-more summary::-webkit-details-marker{display:none}
+.home-more summary::after{content:' ▾';color:var(--mint-400)}
+.home-more[open] summary::after{content:' ▴'}
+.page-kicker{margin:0 0 10px;font-size:18px;font-weight:800;color:var(--mint-400);letter-spacing:-.02em}

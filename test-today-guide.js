@@ -1,4 +1,4 @@
-// 0.4.17 예상 체중·다음 식사 추천·내일 식단 레시피·홈트 단계 진도
+// 0.4.18 예상 체중·다음 식사 추천·내일 식단 레시피·홈트 단계 진도
 const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert');
@@ -71,7 +71,7 @@ assert.strictEqual(Math.round(fb.tdee), 2529);
 
 // 3) 저녁 추천: 집밥은 한식 쪽, 배달은 브랜드, 공식 kcal만, 한마리 큰 단위는 예산 적을 때 후순위
 const foods = ctx.DGFoods.FOODS;
-assert.strictEqual(foods.length, 301);
+assert.strictEqual(foods.length, 309);
 const homeRec = G.recommendDinner({foods, eatenKcal:1000, eatenProt:40, place:'home', limit:3});
 assert.strictEqual(homeRec.items.length, 3);
 homeRec.items.forEach(d => {
@@ -107,7 +107,7 @@ W.stepDown();
 assert.strictEqual(W.state().stage, 1, '1단계 아래로 안 내려감');
 W.setStage(5);
 assert.strictEqual(W.state().stage, 2, '해금 안 된 단계는 못 감');
-assert.strictEqual(vm.runInContext('VERSION', ctx), '0.4.17');
+assert.strictEqual(vm.runInContext('VERSION', ctx), '0.4.18');
 
 const st1 = W.stageOf(1);
 assert.ok(st1.moves.length >= 4);

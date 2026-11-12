@@ -1,4 +1,4 @@
-// 다이어트 게임 0.4.17 — 식사 사진 인식. 칼로리는 AI가 만들지 않고 음식 표 공식 값만 씁니다.
+// 다이어트 게임 0.4.18 — 식사 사진 인식. 칼로리는 AI가 만들지 않고 음식 표 공식 값만 씁니다.
 (function(root){
 const PROXY_URL='https://52-79-146-61.sslip.io/recognize';
 const PORTIONS=[{id:'little',label:'조금',mul:0.5},{id:'normal',label:'보통',mul:1},{id:'lots',label:'많이',mul:1.5}];
@@ -142,8 +142,10 @@ function fileInput(){
   let el=document.getElementById('mealPhotoInput');
   if(!el){
     el=document.createElement('input');
-    el.type='file';el.id='mealPhotoInput';el.accept='image/*';
-    el.hidden=true;
+    el.type='file';el.id='mealPhotoInput';el.accept='image/*,image/heic,image/heif,.heic,.heif,.jpg,.jpeg,.png,.webp';
+    // Android/iOS에서 hidden/display:none 이면 선택 후 change가 안 오는 경우가 있어요. 화면 밖으로만 빼요.
+    el.setAttribute('aria-hidden','true');
+    el.style.cssText='position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:0.01;overflow:hidden;z-index:1;border:0;padding:0;margin:0';
     el.addEventListener('change',onFile);
     document.body.appendChild(el);
   }
@@ -151,17 +153,27 @@ function fileInput(){
 }
 
 function pick(){
-  const el=fileInput();
-  if(!el)return;
-  el.value='';
-  el.click();
+  try{
+    clearError();
+    const el=fileInput();
+    if(!el){showError('사진 선택 창을 열 수 없어요');return;}
+    el.value='';
+    el.click();
+  }catch(err){
+    showError((err&&err.message)||'사진 선택 창을 열 수 없어요');
+  }
 }
 
 function onFile(ev){
-  const f=(ev.target&&ev.target.files&&ev.target.files[0])||null;
-  if(ev.target)ev.target.value='';
-  if(!f)return;
-  recognizeFile(f);
+  const input=ev&&ev.target;
+  const f=(input&&input.files&&input.files[0])||null;
+  // 같은 파일을 다시 고를 수 있게, 파일 객체를 복사한 뒤에 값을 비워요.
+  if(!f){
+    if(input)input.value='';
+    return;
+  }
+  showLoading(true,'사진을 읽고 있어요');
+  recognizeFile(f).finally(()=>{if(input)input.value='';});
 }
 
 function loadImage(blob){
@@ -169,12 +181,12 @@ function loadImage(blob){
     const url=URL.createObjectURL(blob);
     const img=new Image();
     img.onload=()=>{URL.revokeObjectURL(url);resolve(img);};
-    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('사진을 읽지 못했어요'));};
+    img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('decode'));};
     img.src=url;
   });
 }
 
-function resizeToJpeg(img){
+function drawToJpeg(img){
   let w=img.naturalWidth||img.width,h=img.naturalHeight||img.height;
   if(!w||!h)throw new Error('사진 크기를 알 수 없어요');
   if(w>MAX_EDGE||h>MAX_EDGE){
@@ -183,10 +195,35 @@ function resizeToJpeg(img){
   }
   const c=document.createElement('canvas');
   c.width=w;c.height=h;
-  c.getContext('2d').drawImage(img,0,0,w,h);
+  const ctx=c.getContext('2d');
+  if(!ctx)throw new Error('사진을 줄이지 못했어요');
+  ctx.drawImage(img,0,0,w,h);
+  if(img.close)try{img.close();}catch(e){}
   return new Promise((resolve,reject)=>{
     c.toBlob(b=>{if(b)resolve(b);else reject(new Error('사진을 줄이지 못했어요'));},'image/jpeg',JPEG_Q);
   });
+}
+
+async function prepareImage(file){
+  // 1) createImageBitmap(HEIC 일부 지원) 2) Image 디코드 3) 원본을 그대로 전송
+  if(typeof createImageBitmap==='function'){
+    try{
+      const bmp=await createImageBitmap(file);
+      const blob=await drawToJpeg(bmp);
+      return {blob,mime:'image/jpeg'};
+    }catch(e){/* 다음 방법 */}
+  }
+  try{
+    const img=await loadImage(file);
+    const blob=await drawToJpeg(img);
+    return {blob,mime:'image/jpeg'};
+  }catch(e){/* 다음 방법 */}
+  const mime=(file.type||'').split(';')[0]||'image/jpeg';
+  const ok=/^image\/(jpeg|jpg|png|webp|heic|heif)$/i.test(mime)||/\.(heic|heif|jpe?g|png|webp)$/i.test(file.name||'');
+  if(ok&&file.size&&file.size<=2*1024*1024){
+    return {blob:file,mime:mime||'image/jpeg'};
+  }
+  throw new Error('이 사진 형식은 읽지 못했어요. JPEG나 PNG로 다시 찍어 주세요');
 }
 
 function blobToBase64(blob){
@@ -203,25 +240,26 @@ function blobToBase64(blob){
 }
 
 async function recognizeFile(file){
-  if(typeof toast==='function')toast('사진을 살펴보는 중이에요');
-  showLoading(true);
-  let imgBlob=null;
+  showLoading(true,'사진을 살펴보는 중이에요');
   try{
-    const img=await loadImage(file);
-    imgBlob=await resizeToJpeg(img);
-    // 원본 파일 참조는 여기서 끊어요. 리사이즈본만 서버로 보내고, 끝나면 버립니다.
+    const prep=await prepareImage(file);
     file=null;
-    const b64=await blobToBase64(imgBlob);
-    imgBlob=null;
-    const res=await fetch(PROXY_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({image:b64,mime:'image/jpeg'})
-    });
+    const b64=await blobToBase64(prep.blob);
+    showLoading(true,'메뉴를 알아보고 있어요');
+    let res;
+    try{
+      res=await fetch(PROXY_URL,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({image:b64,mime:prep.mime||'image/jpeg'})
+      });
+    }catch(net){
+      throw new Error('인식 서버에 연결하지 못했어요. 네트워크를 확인하고 다시 해 주세요');
+    }
     let data=null;
     try{data=await res.json();}catch(e){data=null;}
     if(!res.ok){
-      const msg=(data&&data.error)||(res.status===429?'요청이 많아요. 잠시 후 다시 해 주세요':res.status===413?'사진이 너무 커요':'사진을 알아보지 못했어요');
+      const msg=(data&&data.error)||(res.status===429?'요청이 많아요. 잠시 후 다시 해 주세요':res.status===413?'사진이 너무 커요':res.status===502||res.status===503?'사진 인식이 잠시 안 돼요. 조금 있다 다시 해 주세요':'사진을 알아보지 못했어요');
       throw new Error(msg);
     }
     const dishes=sanitizeDishes(data);
@@ -232,24 +270,46 @@ async function recognizeFile(file){
     state={rows,slot,place};
     showLoading(false);
     renderConfirm();
+    return rows;
   }catch(err){
-    showLoading(false);
     const msg=(err&&err.message)?err.message:'사진을 알아보지 못했어요';
-    if(typeof toast==='function')toast(msg);
+    showError(msg);
+    throw err;
   }
 }
 
-function showLoading(on){
+function showError(msg){
+  showLoading(false);
+  if(typeof toast==='function')toast(msg);
+  if(typeof document==='undefined')return;
+  let el=document.getElementById('photoMealErr');
+  if(el)el.remove();
+  el=document.createElement('div');
+  el.id='photoMealErr';
+  el.className='photo-meal-err';
+  el.innerHTML='<div class="photo-meal-err-card"><b>사진을 등록하지 못했어요</b><p>'+esc(msg)+'</p>'
+    +'<button type="button" class="btn-primary btn-lg" onclick="document.getElementById(\'photoMealErr\').remove();DGPhotoMeal.pick()">다시 사진 고르기</button>'
+    +'<button type="button" class="btn-secondary" style="width:100%;margin-top:8px" onclick="document.getElementById(\'photoMealErr\').remove()">닫기</button></div>';
+  document.body.appendChild(el);
+}
+function clearError(){
+  if(typeof document==='undefined')return;
+  const el=document.getElementById('photoMealErr');
+  if(el)el.remove();
+}
+
+function showLoading(on,text){
   if(typeof document==='undefined')return;
   let el=document.getElementById('photoMealLoad');
   if(!on){if(el)el.remove();return;}
+  const body='<div class="photo-meal-load-card">'+(esc(text||'사진을 살펴보는 중이에요'))+'<div class="muted" style="margin-top:6px;font-size:12px">사진은 서버에 저장되지 않아요</div></div>';
   if(!el){
     el=document.createElement('div');
     el.id='photoMealLoad';
     el.className='photo-meal-load';
-    el.innerHTML='<div class="photo-meal-load-card">사진을 살펴보는 중이에요<div class="muted" style="margin-top:6px;font-size:12px">사진은 서버에 저장되지 않아요</div></div>';
     document.body.appendChild(el);
   }
+  el.innerHTML=body;
 }
 
 function closeConfirm(){
@@ -390,7 +450,7 @@ function openWithDishes(dishes,opt){
 const api={
   PROXY_URL,PORTIONS,MUL_OF,
   sanitizeDishes,matchDish,matchDishes,nutritionOf,totals,candidatesFor,
-  pick,recognizeFile,closeConfirm,setRowPortion,removeRow,pickCandidate,
+  pick,recognizeFile,closeConfirm,showError,showLoading,clearError,prepareImage,setRowPortion,removeRow,pickCandidate,
   setSlot,setPlace,confirm,openWithDishes,renderConfirm
 };
 root.DGPhotoMeal=api;

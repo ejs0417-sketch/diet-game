@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.17 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색, 다음 식사 추천, 레시피 공유)
-const VERSION='0.4.17', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.18 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색, 다음 식사 추천, 레시피 공유)
+const VERSION='0.4.18', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
@@ -265,13 +265,13 @@ function add(e){const before=compute();raw.push(withId(e));save();const C=comput
  pendingFx={xp:g,todayXp:todayXp(C),levelUp:Math.floor(C.total/100)>Math.floor(before.total/100),ach:newAch,fire:!!(e&&(e.type==='exercise'||e.type==='meal_close'))};
  toast(g>0?`+${g} XP 획득!`+(pendingFx.levelUp?' 🎉 레벨업!':''):'기록했어요');render();}
 function del(id){if(!confirm('이 기록을 지울까요?'))return;raw=raw.filter(e=>e.id!==id);save();render();}
-const NAV=[['home','🏠','홈'],['quest','📋','퀘스트'],['log','📊','기록'],['ach','🛡️','업적'],['me','👤','내정보']];
+const NAV=[['home','🏠','홈'],['coach','🎯','코칭'],['quest','📋','퀘스트'],['log','📊','기록'],['ach','🛡️','업적'],['me','👤','내정보']];
 const QICBG={'⚖️':'var(--mint-50)','🍱':'#FFF4E5','👟':'#EAF0FF','💧':'#E6F6FF','💪':'#FFEDEB','📉':'#EAF0FF','🔥':'#FFF0E2'};
 function render(){migrateVitaminsOnce();const C=compute();
  $('#nav').className='tab-bar';
  $('#nav').innerHTML=NAV.map(([k,i,l])=>`<button type="button" ${tab===k?'aria-current="page"':''} onclick="tab='${k}';if('${k}'==='log')logAdding=false;render()"><span class="ti">${i}</span>${l}</button>`).join('');
  if(tab!=='me'){pvKg=null;meBase=null;}
- $('#view').innerHTML=({home,quest,log,ach,me})[tab](C);
+ $('#view').innerHTML=({home,coach,quest,log,ach,me})[tab](C);
  window.scrollTo(0,0);if(window.dgMountAvatar)window.dgMountAvatar();restoreMealSearchFocus();playPendingFx();}
 function topBar(C,mode){const xp=todayXp(C);
  return `<header class="top-xp"><button type="button" class="menu-btn" aria-label="내정보" onclick="tab='me';render()">☰</button>
@@ -353,6 +353,47 @@ function bodyKgOf(C){
   return C.avatarW;
 }
 function forecastLine(C){return '';}
+function todayFuelHTML(C){
+  const t=C.days[C.today]||{kcal:0,prot:0};
+  const remain=Math.max(0,1800-(t.kcal||0));
+  const prot=Math.round(t.prot||0);
+  const eaten=Math.round(t.kcal||0);
+  const kp=Math.max(0,Math.min(100,eaten/1800*100));
+  const pp=Math.max(0,Math.min(100,prot/130*100));
+  return `<section class="card fuel-card" id="fuelCard">
+    <div class="fuel-h"><h3 style="margin:0">오늘 식사</h3><span class="muted" style="font-size:11px">목표 1,800kcal · 단백질 130g</span></div>
+    <div class="fuel-nums">
+      <div><b class="num fuel-remain">${remain.toLocaleString('ko-KR')}</b><span>남은 kcal</span></div>
+      <div><b class="num">${prot}</b><span>단백질 g / 130</span></div>
+    </div>
+    <div class="fuel-bars"><div class="bar fuel-k"><i style="width:${kp}%"></i></div><div class="bar fuel-p"><i style="width:${pp}%"></i></div></div>
+    <div class="muted" style="font-size:11px;margin-top:6px">먹은 ${eaten.toLocaleString('ko-KR')}kcal</div>
+  </section>`;
+}
+function homeQuickHTML(){
+  const extra=(vitButtons(today())||'')+(window.DGDelivery?`<div style="margin-top:8px"><button type="button" class="btn-secondary" style="width:100%" onclick="DGDelivery.pick()">📷 배달 주문 사진으로 기록</button>${DGDelivery.chipsHTML(compute())}</div>`:'');
+  return `<div class="card home-quick" id="homeQuick">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">빠른 기록</h3></div>
+    <div class="register-row" style="margin-top:0">
+      <button type="button" class="btn-primary btn-lg btn-register" onclick="tab='log';logKind='meal';logAdding=true;mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)">등록하기</button>
+      <button type="button" class="btn-secondary btn-lg btn-photo" onclick="tab='log';logKind='meal';logAdding=false;render();setTimeout(()=>{if(window.DGPhotoMeal)DGPhotoMeal.pick();},50)">사진으로 등록</button>
+    </div>
+    <div class="quick" style="margin-top:10px">${quick()}</div>
+    <details class="home-more"><summary>비타민 · 배달 사진</summary>${extra}</details>
+  </div>`;
+}
+function questHomeHTML(qs){
+  const skip=skipState().ids;
+  const list=qs.filter(q=>!q.done&&!skip.includes(q.id));
+  const rows=list.map(q=>{
+    const lab=q.lab||((q.p!=null&&q.max!=null)?(q.p+'/'+q.max):'');
+    return `<button type="button" class="q-home-row" onclick="tab='quest';render()"><span class="qi">${q.ic||'📋'}</span><span class="qn">${esc(q.t)}</span><span class="muted">${esc(lab)}</span></button>`;
+  }).join('');
+  const empty=list.length?'':`<div class="muted" style="text-align:center;padding:8px">오늘 할 일이 모두 비었어요.</div>`;
+  return `<section class="card q-home-card" id="homeQuests">${questPills(qs)}${rows||empty}
+    <button type="button" class="btn-ghost btn-sm" style="width:100%;margin-top:8px" onclick="tab='quest';render()">건너뛰기·자세히 보기</button>
+  </section>`;
+}
 function home(C){const qs=questDefs(C);
  const p=C.total%100,need=100-p;
  const stats=heroStats(C);
@@ -367,18 +408,20 @@ function home(C){const qs=questDefs(C);
   </div>
   <div class="hero-avatar avatar-frame" id="avatarSlot" data-kg="${bodyKgOf(C).toFixed(2)}" data-idle="0.25"><img class="fallback" src="char.png" alt="캐릭터"><div class="pedestal"></div><div class="avcap">누적 예상 ${bodyKgOf(C).toFixed(1)}kg</div></div>
  </section>
- ${questPills(qs)}
- ${questList(qs,{home:true})}
- ${(window.DGGuide?DGGuide.forecastHTML(C):'')}
- ${(window.DGGuide?DGGuide.coachHTML(C):'')}
+ ${todayFuelHTML(C)}
+ ${homeQuickHTML()}
  ${(window.DGGuide?DGGuide.dinnerHTML(C):'')}
- ${(window.DGGuide&&DGGuide.nextDayHTML)?DGGuide.nextDayHTML(C):''}
- ${(window.DGWorkout?DGWorkout.cardHTML(C):'')}
- <div class="card" style="margin-top:4px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">빠른 기록</h3><span class="stat-chip flame">🔥 스트릭 <span class="num-i">${C.streak}</span>일</span></div>
- <div class="quick">${quick()}</div>${vitButtons(today())}
- ${(window.DGDelivery?`<div style="margin-top:8px"><button type="button" class="btn-secondary" style="width:100%" onclick="DGDelivery.pick()">📷 배달 주문 사진으로 기록</button>${DGDelivery.chipsHTML(C)}</div>`:'')}
- </div>
- ${(window.DGHealth?DGHealth.summaryCard():'')}
+ ${questHomeHTML(qs)}
+ <button type="button" class="btn-ghost" style="width:100%;margin:8px 0 12px" onclick="tab='coach';render()">예상 체중·내일 식단·홈트는 코칭 탭에서 보기</button>
+ </div>`;}
+function coach(C){
+ return topBar(C,'xp')+`<div class="page"><h2 class="page-kicker">코칭</h2>
+  <p class="muted" style="font-size:12px;margin:0 0 10px">예상 체중, 내일 식단, 홈트, 코치 한마디는 여기에 모아 두었어요. 기능은 그대로예요.</p>
+  ${(window.DGGuide?DGGuide.forecastHTML(C):'')}
+  ${(window.DGGuide?DGGuide.coachHTML(C):'')}
+  ${(window.DGGuide&&DGGuide.nextDayHTML)?DGGuide.nextDayHTML(C):''}
+  ${(window.DGWorkout?DGWorkout.cardHTML(C):'')}
+  ${(window.DGHealth?DGHealth.summaryCard():'')}
  </div>`;}
 function quick(){return `<button type="button" onclick="askWeight()"><span class="e">⚖️</span>체중</button><button type="button" onclick="tab='log';logKind='meal';logAdding=true;mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"><span class="e">🍱</span>식사</button><button type="button" onclick="addWalk()"><span class="e">👟</span>걷기</button><button type="button" onclick="add({date:today(),type:'water',item:'물',value:'0.5',note:''})"><span class="e">💧</span>물 0.5L</button>`;}
 function normVit(s){return (typeof DGSup!=='undefined'&&DGSup.norm)?DGSup.norm(s):String(s||'').trim();}

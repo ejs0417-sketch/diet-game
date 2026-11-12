@@ -39,13 +39,14 @@ has('냉면', h=>h.item.id==='mul-naengmyeon'||h.item.id==='bibim-naengmyeon', '
 const jj=search.searchFoods('짜장면',{foods:foods.FOODS,limit:5})[0];
 assert.ok(jj && jj.item.kcal>=700 && jj.item.unit==='1인분', '짜장면 kcal 1인분');
 
-assert.strictEqual(foods.count, 301, '음식 301개 (기존 283 + 기본음식 18)');
+assert.strictEqual(foods.count, 309, '음식 309개 (기존 301 + 집밥 반찬 8)');
 
 // 짧은 한글 검색이 초성 오탐으로 엉뚱한 메뉴를 넣지 않아요
 const kimchi=names('김치');
 assert(kimchi.includes('김치찌개') && kimchi.includes('김치볶음밥'), '김치 계열');
 assert(!kimchi.some(n=>n.includes('고추마요')||n.includes('설빙')||n.includes('레드콤보')||n.includes('감자튀김')), '김치 오탐 없음: '+kimchi.join(','));
-assert.strictEqual(kimchi[0], '김치찌개', '김치 첫 결과 '+kimchi[0]);
+assert.strictEqual(kimchi[0], '배추김치', '김치 첫 결과는 배추김치: '+kimchi[0]);
+assert.ok(kimchi.includes('김치찌개'), '김치찌개도 결과에 포함');
 
 // 0.4.15 다이어트 기본 음식
 has('우유', h=>h.item.id==='staple-milk', '우유');

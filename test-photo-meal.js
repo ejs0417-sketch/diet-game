@@ -1,4 +1,4 @@
-// 0.4.17 사진 인식: 음식 표 매칭, 공식 영양만 사용, AI kcal 무시
+// 0.4.18 사진 인식: 음식 표 매칭, 공식 영양만 사용, AI kcal 무시
 const assert=require('assert');
 const vm=require('vm');
 const fs=require('fs');
@@ -25,17 +25,25 @@ assert.strictEqual(idOf('김치찌개'),'kimchi-jjigae');
 
 // 조리법이 다른 반찬은 날것의 달걀·두부에 자동 매칭하면 안 됨
 const egg=PM.matchDish('달걀전');
-assert.ok(!egg.food,'달걀전은 표에 없으면 자동 매칭 금지 (초성으로 닭강정에 붙으면 안 됨)');
+assert.strictEqual(egg.food&&egg.food.id,'side-egg-jeon','달걀전은 공식 달걀전 항목');
+assert.ok(egg.food.id!=='staple-egg');
 assert.ok(!(egg.candidates||[]).some(c=>/치킨|닭강정/.test(c.name)),'달걀전 후보에 치킨이 들어가면 안 됨');
+assert.strictEqual(idOf('계란전'),'side-egg-jeon');
 const tofu=PM.matchDish('두부조림');
-assert.ok(!tofu.food || tofu.food.id!=='staple-tofu','두부조림을 생두부로 자동 매칭하면 안 됨');
+assert.strictEqual(tofu.food&&tofu.food.id,'side-tofu-jorim');
+assert.ok(tofu.food.id!=='staple-tofu','두부조림을 생두부로 매칭하면 안 됨');
 const quail=PM.matchDish('메추리알 장조림');
-assert.ok(!quail.food,'메추리알 장조림은 표에 없으면 자동 매칭 금지');
+assert.ok(!quail.food,'메추리알 장조림은 공식 값이 없어 자동 매칭 금지');
 const kimchi=PM.matchDish('배추김치');
-assert.ok(!kimchi.food || kimchi.food.id!=='kimchi-jjigae','배추김치를 김치찌개로 매칭하면 안 됨');
+assert.strictEqual(kimchi.food&&kimchi.food.id,'side-baechu-kimchi');
+assert.ok(kimchi.food.id!=='kimchi-jjigae','배추김치를 김치찌개로 매칭하면 안 됨');
+assert.strictEqual(idOf('깍두기'),'side-kkakdugi');
+assert.strictEqual(idOf('고등어구이'),'side-mackerel');
+assert.strictEqual(idOf('멸치볶음'),'side-anchovy');
+assert.strictEqual(idOf('시금치나물'),'side-spinach-namul');
+assert.strictEqual(idOf('미역국'),'side-miyeokguk');
 
 // 후보에는 가까운 메뉴가 있어야 함
-assert.ok((egg.candidates||[]).length>=1 || egg.status!=='match','달걀전 후보');
 
 // AI가 kcal를 넣어도 버리고, 영양은 음식 표만
 const dirty={dishes:[
@@ -64,8 +72,14 @@ assert.strictEqual(PM.nutritionOf(riceFood,0.5).kcal,Math.round(riceFood.kcal*0.
 assert.strictEqual(PM.nutritionOf(riceFood,1.5).kcal,Math.round(riceFood.kcal*1.5));
 
 const tot=PM.totals(rows.filter(r=>r.food),'');
-assert.strictEqual(tot.kcal,nu.kcal+nu2.kcal);
+const eggRow=rows[2];
+assert.strictEqual(eggRow.food.id,'side-egg-jeon');
+const nu3=PM.nutritionOf(eggRow.food,1.5);
+assert.strictEqual(nu3.kcal,Math.round(foods.find(f=>f.id==='side-egg-jeon').kcal*1.5));
+assert.strictEqual(tot.kcal,nu.kcal+nu2.kcal+nu3.kcal);
 assert.ok(tot.kcal<9999);
+assert.notStrictEqual(nu3.kcal,5000);
+
 
 // 프록시 URL에 키가 없고 github.io 공개 저장소 값을 쓰지 않음
 assert.ok(/^https:\/\/52-79-146-61\.sslip\.io\//.test(PM.PROXY_URL));

@@ -28,7 +28,7 @@
 <script>if('serviceWorker' in navigator){
   const hadController=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadController)location.reload();});
-  navigator.serviceWorker.register('sw.js?v=0.4.17',{updateViaCache:'none'}).then(reg=>{
+  navigator.serviceWorker.register('sw.js?v=0.4.18',{updateViaCache:'none'}).then(reg=>{
     const ping=()=>reg.update();
     ping();
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)ping();});
