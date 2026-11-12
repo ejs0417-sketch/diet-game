@@ -1,4 +1,4 @@
-const V='dg-0.4.22';
+const V='dg-0.4.23';
 const FILES=['./','index.html','app.js','auth.js','health.js','health-ranges.js','supplements.js','coach.js','today-guide.js','recipes.js','home-workout.js','delivery-foods.js','custom-foods.js','food-search.js','photo-meal.js','delivery.js','char.png','icon-192.png','icon-512.png','manifest.webmanifest','face.js','avatar.js','vendor/three.custom.min.js','assets/avatar/char-current-0.4.9.glb','assets/avatar/char-goal-0.4.9.glb','assets/avatar/char-00-0.4.15.glb','assets/avatar/char-25-0.4.15.glb','assets/avatar/char-50-0.4.15.glb','assets/avatar/char-75-0.4.15.glb','assets/avatar/char-100-0.4.15.glb','design-tokens.css','screens.css','vendor/fonts/PretendardVariable.woff2','vendor/fonts/Lexend-latin.woff2','vendor/pdfjs/pdf.min.mjs','vendor/pdfjs/pdf.worker.min.mjs'];
 self.addEventListener('install',e=>{
   e.waitUntil((async()=>{

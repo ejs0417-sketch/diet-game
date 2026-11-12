@@ -1,4 +1,4 @@
-// 0.4.22 인터넷 검색값: 출처 없는 값은 거부, 공식 표 우선, 폰 안에만 저장
+// 0.4.23 인터넷 검색값: 출처 없는 값은 거부, 공식 표 우선, 폰 안에만 저장
 const assert=require('assert');
 const vm=require('vm');
 const fs=require('fs');
@@ -67,5 +67,14 @@ assert.strictEqual(CF.CKEY,'dg_custom_foods_v1');
 assert.ok(localStorage.getItem(CF.CKEY));
 assert.ok(!/AIza|GEMINI_API_KEY/.test(fs.readFileSync(path.join(dir,'custom-foods.js'),'utf8')));
 assert.ok(/^https:\/\/52-79-146-61\.sslip\.io\/lookup$/.test(CF.LOOKUP_URL));
+
+
+// 확인 없이 저장. 출처 있는 값만.
+const applied=CF.applyFound({found:true,name:'샐러디 멕시칸 랩',serving:'1개',kcal:430,protein:22,sources:[{url:'https://www.salady.co.kr/menu',title:'샐러디 공식'}]},'멕시칸 랩',{});
+assert.ok(applied&&applied.custom&&applied.sourceUrl==='https://www.salady.co.kr/menu');
+assert.ok(CF.byId(applied.id));
+assert.ok(applied.src.indexOf('인터넷 검색값')>=0);
+// 출처 없으면 applyFound까지 못 감 — sanitizeLookup 거부 유지
+assert.strictEqual(CF.sanitizeLookup({found:true,name:'x',kcal:100,sources:[]}).found,false);
 
 console.log('custom-foods tests ok',{saved:saved.name,rice:rice.food.id,edit:ed.kcal});

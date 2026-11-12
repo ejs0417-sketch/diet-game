@@ -1,4 +1,4 @@
-// 0.4.22 사진 인식: 음식 표 매칭, 공식 영양만 사용, AI kcal 무시
+// 0.4.23 사진 인식: 음식 표 매칭, 공식 영양만 사용, AI kcal 무시
 const assert=require('assert');
 const vm=require('vm');
 const fs=require('fs');
@@ -128,6 +128,33 @@ console.log('photo-meal 0.4.19 slot/receipt tests ok',{exif:'12:24 점심',store
 assert.ok(/^https:\/\/52-79-146-61\.sslip\.io\//.test(PM.PROXY_URL));
 assert.ok(!/AIza|GEMINI|api[_-]?key/i.test(fs.readFileSync(path.join(__dirname,'photo-meal.js'),'utf8')));
 assert.ok(!/AIza|GEMINI_API_KEY/.test(fs.readFileSync(path.join(__dirname,'app.js'),'utf8')));
+
+
+// 0.4.23 매칭을 엄격히: '멕시칸 랩'이 후라이드 치킨(별칭 멕시칸=멕시카나)으로 붙지 않아요.
+assert.strictEqual(idOf('멕시칸 랩'), null, '멕시칸 랩은 후라이드 치킨이 아님');
+assert.strictEqual(PM.matchDish('멕시칸 랩').status,'none');
+assert.strictEqual((PM.matchDish('멕시칸 랩').candidates||[]).length,0, '관련 없는 가까운 메뉴 없음');
+const salad=PM.matchDish('로스트닭다리살 샐러드');
+assert.ok(!salad.food, '로스트닭다리살 샐러드는 자동 매칭 없음');
+assert.ok(!(salad.candidates||[]).some(f=>f.id==='leg-4'), '치킨다리 4조각을 가까운 메뉴로 제안하지 않음');
+// 별칭 전체 이름(멕시카나)은 그대로 후라이드 대표값
+assert.strictEqual(idOf('멕시카나'),'fried-w');
+// 재료가 붙은 집밥·브랜드 공식 메뉴는 깨지지 않아요.
+assert.strictEqual(idOf('애호박 두부 된장찌개'),'doenjang');
+assert.strictEqual(idOf('교촌 허니콤보'),'kyochon-honey-combo');
+assert.strictEqual(idOf('허니한마리'),'kyochon-honey');
+assert.strictEqual(idOf('황금올리브치킨'),'bbq-goldolive');
+assert.strictEqual(idOf('핫황금올리브치킨 크리스피'),'bbq-hot-goldolive');
+assert.strictEqual(idOf('롯데리아 한우불고기버거'),'lot-hanwoo');
+assert.strictEqual(idOf('리아 불고기'),'lot-ria-bulgogi');
+assert.strictEqual(idOf('후라이드 치킨 한마리'),'fried-w');
+assert.strictEqual(idOf('네네 후라이드'),'fried-w');
+assert.strictEqual(idOf('봉구스 밥버거'),'bg-original');
+assert.strictEqual(PM.brandOf('샐러디 샐러드&샌드위치'),'샐러디');
+assert.ok(PM.remainderOk('애호박 두부 된장찌개','된장찌개',foods.find(f=>f.id==='doenjang')));
+assert.ok(!PM.remainderOk('멕시칸 랩','멕시칸',foods.find(f=>f.id==='fried-w')));
+
+// 인터넷 검색값은 출처가 있으면 확인 없이 저장돼요. 출처 없으면 거부.
 
 console.log('photo-meal tests ok',{
   rice:idOf('쌀밥'),

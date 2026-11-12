@@ -1,4 +1,4 @@
-// 다이어트 게임 0.4.22 — 인터넷에서 찾은 영양(출처 있는 값만). 폰 안에만 저장하고 공식 음식 표가 우선입니다.
+// 다이어트 게임 0.4.23 — 인터넷에서 찾은 영양(출처 있는 값만). 폰 안에만 저장하고 공식 음식 표가 우선입니다.
 (function(root){
 const LOOKUP_URL='https://52-79-146-61.sslip.io/lookup';
 const CKEY='dg_custom_foods_v1';
@@ -187,11 +187,43 @@ function renderLookup(){
   else document.body.insertAdjacentHTML('beforeend',html);
 }
 
+/** 출처가 있는 검색값을 확인 없이 이 폰에 저장하고, 열려 있는 기록에 바로 넣어요. */
+function applyFound(result,query,ctx){
+  ctx=ctx||{};
+  const food=upsert({
+    name:result.name,
+    unit:result.serving,
+    serving:result.serving,
+    kcal:result.kcal,
+    protein:result.protein,
+    sources:result.sources
+  },query);
+  if(!food){
+    if(!ctx.silent&&typeof toast==='function')toast('저장하지 못했어요');
+    return null;
+  }
+  closeLookup();
+  if(typeof toast==='function')toast('‘'+food.name+'’을(를) 인터넷 검색값으로 넣었어요');
+  const mul=1;
+  if(ctx.photoIndex!=null&&root.DGPhotoMeal&&DGPhotoMeal.applyFood){
+    DGPhotoMeal.applyFood(ctx.photoIndex,food,mul);
+    return food;
+  }
+  if(ctx.search&&root.DGFoodSearch&&DGFoodSearch.pick){
+    DGFoodSearch.pick(food.id);
+    if(typeof render==='function')render();
+    return food;
+  }
+  if(typeof render==='function')render();
+  return food;
+}
+
 async function lookup(query,ctx){
   query=String(query||'').trim().slice(0,80);
-  if(!query){if(typeof toast==='function')toast('찾을 메뉴 이름을 적어 주세요');return;}
-  const store=ctx&&ctx.store?String(ctx.store).slice(0,40):'';
-  showLookupLoading(query);
+  if(!query){if(typeof toast==='function')toast('찾을 메뉴 이름을 적어 주세요');return {found:false};}
+  ctx=ctx||{};
+  const store=ctx.store?String(ctx.store).slice(0,40):'';
+  if(!ctx.silent)showLookupLoading(query);
   try{
     let res;
     try{
@@ -211,13 +243,16 @@ async function lookup(query,ctx){
     }
     const clean=sanitizeLookup(data);
     if(!clean.found){
-      showLookupError('공식 출처에서 ‘'+query+'’의 영양 값을 찾지 못했어요. 값을 만들어 넣지는 않아요.',query,ctx);
+      if(!ctx.silent)showLookupError('공식 출처에서 ‘'+query+'’의 영양 값을 찾지 못했어요. 값을 만들어 넣지는 않아요.',query,ctx);
+      else closeLookup();
       return clean;
     }
-    showLookupResult(clean,query,ctx);
+    // 출처가 확인된 값만 자동 저장합니다. 숫자는 만들지 않아요.
+    applyFound(clean,query,ctx);
     return clean;
   }catch(err){
-    showLookupError((err&&err.message)||'검색하지 못했어요',query,ctx);
+    if(!ctx.silent)showLookupError((err&&err.message)||'검색하지 못했어요',query,ctx);
+    else closeLookup();
     return {found:false};
   }
 }
@@ -238,29 +273,7 @@ function lookupForSearch(query){
 }
 function confirmLookup(){
   if(!lookupState||!lookupState.result)return;
-  const r=lookupState.result, q=lookupState.query, ctx=lookupState.ctx||{};
-  const food=upsert({
-    name:r.name,
-    unit:r.serving,
-    serving:r.serving,
-    kcal:r.kcal,
-    protein:r.protein,
-    sources:r.sources
-  },q);
-  if(!food){if(typeof toast==='function')toast('저장하지 못했어요');return;}
-  const mul=lookupState.portion==='조금'?0.5:lookupState.portion==='많이'?1.5:1;
-  closeLookup();
-  if(typeof toast==='function')toast('‘'+food.name+'’을(를) 내가 찾은 메뉴에 넣었어요');
-  if(ctx.photoIndex!=null&&root.DGPhotoMeal&&DGPhotoMeal.applyFood){
-    DGPhotoMeal.applyFood(ctx.photoIndex,food,mul);
-    return;
-  }
-  if(ctx.search&&root.DGFoodSearch&&DGFoodSearch.pick){
-    DGFoodSearch.pick(food.id);
-    if(typeof render==='function')render();
-    return;
-  }
-  if(typeof render==='function')render();
+  applyFound(lookupState.result,lookupState.query,lookupState.ctx||{});
 }
 
 function cardHTML(){
@@ -313,7 +326,7 @@ const api={
   LOOKUP_URL,CKEY,list,save,usable,all,byId,officialKeys,
   sanitizeFood,sanitizeLookup,sanitizeSources,upsert,remove,update,coveredByOfficial,
   lookup,lookupForPhoto,lookupForSearch,confirmLookup,closeLookup,setPortion,
-  showLookupResult,cardHTML,editPrompt,saveEdit
+  showLookupResult,applyFound,cardHTML,editPrompt,saveEdit
 };
 root.DGCustomFoods=api;
 if(typeof module!=='undefined'&&module.exports)module.exports=api;

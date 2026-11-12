@@ -1,4 +1,4 @@
-// 다이어트 게임 0.4.22 — 식사 사진 인식. 칼로리는 AI가 만들지 않고 음식 표 공식 값만 씁니다. 끼니는 사진 시각(서울), 배달 결제내역 지원.
+// 다이어트 게임 0.4.23 — 식사 사진 인식. 칼로리는 AI가 만들지 않고 음식 표 공식 값만 씁니다. 끼니는 사진 시각(서울), 배달 결제내역 지원.
 (function(root){
 const PROXY_URL='https://52-79-146-61.sslip.io/recognize';
 const PORTIONS=[{id:'little',label:'조금',mul:0.5},{id:'normal',label:'보통',mul:1},{id:'lots',label:'많이',mul:1.5}];
@@ -182,8 +182,18 @@ function foods(){return (root.DGCustomFoods&&DGCustomFoods.all())||((root.DGFood
 function searchFoods(q,opts){return (root.DGFoodSearch&&DGFoodSearch.searchFoods(q,opts))||[];}
 function norm(s){return root.DGFoodSearch?DGFoodSearch.norm(s):String(s||'').toLowerCase().replace(/\s+/g,'');}
 function foodKeys(item){return [item.name].concat(item.aliases||[]).concat(item.searchAliases||[]).filter(Boolean);}
+/** 자동 매칭·후보에는 검색용 짧은 별칭(예: '치킨')을 쓰지 않아요. */
+function matchKeys(item){return [item.name].concat(item.aliases||[]).filter(Boolean);}
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
+
+/** 가게 이름에서 브랜드만 가져와요. '샐러디 샐러드&샌드위치' → '샐러디'. */
+function brandOf(store){
+  const s=String(store||'').trim();
+  if(!s)return '';
+  const t=s.split(/[\s&,/·|]+/).filter(Boolean)[0]||'';
+  return t.replace(/(점|본점|가게)$/,'').slice(0,20);
+}
 
 function containedScore(query,key){
   const nq=norm(query),nk=norm(key);
@@ -195,6 +205,29 @@ function containedScore(query,key){
   if(nq.includes(nk)&&nk.length>=3)return 70+Math.min(20,Math.round(20*nk.length/Math.max(nq.length,1)));
   if(nk.includes(nq)&&nq.length>=3)return 80;
   return 0;
+}
+
+// 한마리·곱빼기처럼 양·크기만 남은 경우는 같은 메뉴로 봐요. '랩'·'샐러드'처럼 다른 음식 종류가 남으면 자동으로 붙이지 않아요.
+const WEAK_REST=/^(한|반|두)?(마리|조각|인분|개|판|줄|봉|컵|잔|그릇|팩|박스|사이즈)?(곱빼기|추가|라지|미디움|스몰|large|medium|small|[lmswh])?$/i;
+function leftover(query,key){
+  const nq=norm(query),nk=norm(key);
+  if(!nq||!nk||nq===nk)return '';
+  if(nq.startsWith(nk))return nq.slice(nk.length);
+  if(nq.endsWith(nk))return nq.slice(0,nq.length-nk.length);
+  if(nq.includes(nk))return nq.split(nk).join('');
+  return '';
+}
+function remainderOk(query,key,item){
+  const rest=leftover(query,key);
+  if(!rest)return true;
+  if(WEAK_REST.test(rest))return true;
+  const keys=matchKeys(item).map(norm).filter(Boolean);
+  if(keys.some(k=>k===rest||k.includes(rest)||(rest.includes(k)&&k.length>=2)))return true;
+  const nq=norm(query),nk=norm(key);
+  // 한국어 메뉴는 뒤에 음식 종류가 옵니다. '애호박 두부 된장찌개'는 된장찌개로 봐요.
+  // 앞에만 별칭이 겹치는 '멕시칸 랩'(별칭 멕시칸)은 남은 '랩'이 다른 음식이라 안 붙입니다.
+  if(nk.length>=3&&nq.endsWith(nk))return true;
+  return false;
 }
 
 function isCookedVariant(query,key){
@@ -238,16 +271,20 @@ function uniqueFoods(arr){
   return out;
 }
 
-function textHits(query,limit){
+function textHits(query,limit,opts){
   const q=String(query||'').trim();
+  const min=opts&&opts.minScore!=null?opts.minScore:70;
+  const strict=!!(opts&&opts.strict);
   const scored=[];
   foods().forEach(item=>{
     let best=0,via='';
-    foodKeys(item).forEach(key=>{
+    matchKeys(item).forEach(key=>{
       const s=containedScore(q,key);
       if(s>best){best=s;via=key;}
     });
-    if(best>=70)scored.push({item,score:best,via});
+    if(best<min)return;
+    if(strict&&!remainderOk(q,via,item))return;
+    scored.push({item,score:best,via});
   });
   scored.sort((a,b)=>b.score-a.score||norm(b.via).length-norm(a.via).length);
   return scored.slice(0,limit||6);
@@ -260,7 +297,8 @@ function candidatesFor(query,excludeId){
   if(m&&m[1]&&m[1].replace(/\s+/g,'').length>=2)variants.push(m[1].trim());
   const hits=[];
   variants.forEach(v=>{
-    textHits(v,6).forEach(h=>{if(h&&h.item)hits.push(h.item);});
+    // 가까운 메뉴는 이름 대부분이 겹치고, 남은 말이 양·크기일 때만 보여 줘요.
+    textHits(v,6,{minScore:88,strict:true}).forEach(h=>{if(h&&h.item)hits.push(h.item);});
   });
   return uniqueFoods(hits).filter(f=>f.id!==excludeId).slice(0,5);
 }
@@ -268,10 +306,10 @@ function candidatesFor(query,excludeId){
 function matchDish(query){
   const q=String(query||'').trim();
   if(!q)return {status:'none',food:null,candidates:[],query:q,score:0,via:''};
-  // 사진에서 온 이름은 초성 검색을 쓰지 않아요. '달걀전'과 '닭강정'처럼 초성만 같은 메뉴가 붙지 않게 해요.
+  // 사진·영수증 이름은 초성 검색을 쓰지 않아요. '달걀전'과 '닭강정'처럼 초성만 같은 메뉴가 붙지 않게 해요.
   let best=null;
   foods().forEach(item=>{
-    foodKeys(item).forEach(key=>{
+    matchKeys(item).forEach(key=>{
       let s=containedScore(q,key);
       if(s<=0)return;
       const cooked=isCookedVariant(q,key);
@@ -283,7 +321,8 @@ function matchDish(query){
       }
     });
   });
-  const auto=best&&best.score>=84&&!best.cooked;
+  // 확실한 경우만 자동으로 붙입니다. 별칭 앞부분만 같거나('멕시칸' ⊂ '멕시칸 랩') 한 단어(닭·치킨)만 겹치면 붙이지 않아요.
+  const auto=best&&best.score>=84&&!best.cooked&&remainderOk(q,best.via,best.item);
   const food=auto?best.item:null;
   const candidates=candidatesFor(q,food&&food.id);
   const status=food?'match':(candidates.length?'pick':'none');
@@ -592,10 +631,21 @@ function rowHTML(r,i,place){
     const n=nutritionOf(c,r.portionMul||1,place);
     return `<button type="button" class="pm-cand" onclick="DGPhotoMeal.pickCandidate(${i},'${escJs(c.id)}')"><b>${esc(c.name)}</b><span>${n.kcal.toLocaleString('ko-KR')}kcal · ${esc(c.unit||'')}</span></button>`;
   }).join('');
+  if(r.looking){
+    return `<div class="pm-row pm-unmatched">
+      <div class="pm-row-h"><span class="nm"><b>‘${esc(r.name)}’</b><span>인터넷에서 공식 출처의 영양 값을 찾고 있어요.</span></span>
+        <button type="button" class="icon-btn" aria-label="빼기" onclick="DGPhotoMeal.removeRow(${i})">✕</button></div>
+    </div>`;
+  }
+  const fail=r.lookupFail?`<div class="muted" style="margin-top:6px">인터넷에서 출처 있는 값을 찾지 못했어요. 값을 만들어 넣지는 않아요.</div>`:'';
+  const hint=state&&state.kind==='receipt'
+    ?'음식 표에 바로 맞는 메뉴가 없어요. 가까운 메뉴를 고르거나, 인터넷 검색값을 기다려 주세요.'
+    :'음식 표에서 바로 맞는 메뉴가 없어요. 가까운 메뉴를 고르거나, 인터넷에서 찾아 주세요.';
   return `<div class="pm-row pm-unmatched">
-    <div class="pm-row-h"><span class="nm"><b>‘${esc(r.name)}’</b><span>음식 표에서 바로 맞는 메뉴가 없어요. 가까운 메뉴를 고르거나, 인터넷에서 찾아 주세요.</span></span>
+    <div class="pm-row-h"><span class="nm"><b>‘${esc(r.name)}’</b><span>${hint}</span></span>
       <button type="button" class="icon-btn" aria-label="빼기" onclick="DGPhotoMeal.removeRow(${i})">✕</button></div>
     <div class="pm-cands">${cands||'<div class="muted">가까운 메뉴가 없어요.</div>'}</div>
+    ${fail}
     <button type="button" class="btn-secondary" style="width:100%;margin-top:8px" onclick="DGCustomFoods.lookupForPhoto(${i})">인터넷에서 찾기</button>
   </div>`;
 }
@@ -615,8 +665,8 @@ function renderConfirm(){
   const isPast=date&&date!==todaySeoul();
   const title=state.kind==='receipt'?'결제 내역에서 찾은 메뉴':'사진으로 찾은 메뉴';
   const hint=state.kind==='receipt'
-    ?'가게·메뉴·수량·주문 시각만 써요. 주소·전화·카드·주문번호·결제 정보는 읽어서 버려요. 칼로리는 음식 표의 공식 값이에요.'
-    :'칼로리는 음식 표의 공식 값이에요. AI가 숫자를 만들지 않아요. 사진은 저장하지 않아요.';
+    ?'가게·메뉴·수량·주문 시각만 써요. 주소·전화·카드·주문번호·결제 정보는 읽어서 버려요. 표에 없는 메뉴는 가게 이름으로 인터넷에서 찾아, 출처가 있으면 바로 넣어요. 숫자는 만들지 않아요.'
+    :'칼로리는 음식 표의 공식 값이에요. 표에 없으면 인터넷 검색값(출처 있는 값만)을 쓸 수 있어요. AI가 숫자를 만들지 않아요. 사진은 저장하지 않아요.';
   const store=state.store?`<div class="pm-store">가게 <b>${esc(state.store)}</b></div>`:'';
   const html=`<div class="photo-meal-pane" id="photoMealPane">
     <div class="photo-meal-card">
@@ -725,7 +775,39 @@ function openWithReceipt(data,photoWhen){
   const date=when.date||todaySeoul();
   state={rows,slot,place:'delivery',date,when,kind:'receipt',store:rec.store||''};
   renderConfirm();
+  autoLookupUnmatched();
   return state;
+}
+
+/** 배달 결제내역에서 표에 없는 메뉴는 가게(브랜드) 이름을 넣어 인터넷 찾기를 자동으로 하고, 출처 있는 값이면 바로 저장·반영해요. */
+function autoLookupUnmatched(){
+  if(typeof document==='undefined')return Promise.resolve();
+  if(!state||state.kind!=='receipt')return Promise.resolve();
+  if(!(root.DGCustomFoods&&typeof DGCustomFoods.lookup==='function'))return Promise.resolve();
+  const store=brandOf(state.store)||state.store||'';
+  const idxs=[];
+  state.rows.forEach((r,i)=>{if(r&&!r.food&&!r.removed&&!r.looking)idxs.push(i);});
+  if(!idxs.length)return Promise.resolve();
+  let chain=Promise.resolve();
+  idxs.forEach(i=>{
+    chain=chain.then(async()=>{
+      if(!state||!state.rows[i]||state.rows[i].food||state.rows[i].removed)return;
+      state.rows[i].looking=true;
+      state.rows[i].lookupFail=false;
+      renderConfirm();
+      try{
+        const clean=await DGCustomFoods.lookup(state.rows[i].name,{photoIndex:i,store,silent:true,autoApply:true});
+        if(state&&state.rows[i]){
+          state.rows[i].looking=false;
+          if(!(clean&&clean.found)&&!state.rows[i].food)state.rows[i].lookupFail=true;
+        }
+      }catch(e){
+        if(state&&state.rows[i]){state.rows[i].looking=false;if(!state.rows[i].food)state.rows[i].lookupFail=true;}
+      }
+      renderConfirm();
+    });
+  });
+  return chain;
 }
 
 function getState(){return state;}
@@ -737,6 +819,8 @@ function applyFood(i,food,mul){
   r.food=food;
   r.status='match';
   r.candidates=[];
+  r.looking=false;
+  r.lookupFail=false;
   r.sizeMul=sizeMul;
   r.portionMul=(r.qty||1)*sizeMul;
   r.portion=sizeMul===0.5?'조금':sizeMul===1.5?'많이':'보통';
@@ -747,7 +831,8 @@ const api={
   sanitizeDishes,sanitizeReceipt,scrubPii,matchDish,matchDishes,nutritionOf,totals,candidatesFor,
   parseJpegExifDate,parseExifAsciiDate,suggestMealSlotAt,seoulParts,readPhotoWhen,whenFromDate,whenLabel,
   pick,showChooser,closeChooser,recognizeFile,closeConfirm,showError,showLoading,clearError,prepareImage,setRowPortion,setRowQty,removeRow,pickCandidate,
-  setSlot,setDate,setPlace,confirm,openWithDishes,openWithReceipt,renderConfirm,getState,rowName,applyFood
+  setSlot,setDate,setPlace,confirm,openWithDishes,openWithReceipt,renderConfirm,getState,rowName,applyFood,
+  matchKeys,brandOf,leftover,remainderOk,autoLookupUnmatched
 };
 root.DGPhotoMeal=api;
 if(typeof module!=='undefined'&&module.exports)module.exports=api;
