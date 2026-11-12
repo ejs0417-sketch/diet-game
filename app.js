@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.16 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색, 다음 식사 추천, 레시피 공유)
-const VERSION='0.4.16', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.17 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색, 다음 식사 추천, 레시피 공유)
+const VERSION='0.4.17', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
@@ -524,7 +524,10 @@ function eatenTodayHTML(date,C){
     ${body}
     <div class="eaten-tot">단백질 ${Math.round(d.prot||0)}g / 130g</div>
   </div>
-  <button type="button" class="btn-primary btn-lg btn-register" id="mealRegisterBtn" onclick="openMealComposer()">등록하기</button>`;
+  <div class="register-row">
+    <button type="button" class="btn-primary btn-lg btn-register" id="mealRegisterBtn" onclick="openMealComposer()">등록하기</button>
+    <button type="button" class="btn-secondary btn-lg btn-photo" id="mealPhotoBtn" onclick="if(window.DGPhotoMeal)DGPhotoMeal.pick()">사진으로 등록</button>
+  </div>`;
 }
 
 function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0,walk:0,water:0,missingKcal:0,vit:{},closed:false,strength:0,rest:false};

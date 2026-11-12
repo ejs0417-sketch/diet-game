@@ -21,13 +21,14 @@
 <script src="home-workout.js"></script>
 <script src="delivery-foods.js"></script>
 <script src="food-search.js"></script>
+<script src="photo-meal.js"></script>
 <script src="delivery.js"></script>
 <script type="module" src="face.js"></script>
 <script type="module" src="avatar.js"></script>
 <script>if('serviceWorker' in navigator){
   const hadController=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadController)location.reload();});
-  navigator.serviceWorker.register('sw.js?v=0.4.16',{updateViaCache:'none'}).then(reg=>{
+  navigator.serviceWorker.register('sw.js?v=0.4.17',{updateViaCache:'none'}).then(reg=>{
     const ping=()=>reg.update();
     ping();
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)ping();});

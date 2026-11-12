@@ -358,3 +358,33 @@ html,body{background:var(--bg);color:var(--ink-700)}
   .btn-register{min-height:46px;margin-top:8px}
   .eaten-item{padding:6px 10px}
 }
+
+/* 0.4.17 사진으로 등록 */
+.register-row{display:flex;gap:8px;margin-top:12px;align-items:stretch}
+.register-row .btn-register,.register-row .btn-photo{flex:1;margin-top:0;width:auto;min-height:52px;font-size:16px;font-weight:800}
+.photo-meal-load{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:24px}
+.photo-meal-load-card{background:var(--surface);color:var(--ink-900);border-radius:16px;padding:22px 20px;text-align:center;font-weight:800;box-shadow:var(--sh-1);max-width:280px}
+.photo-meal-pane{position:fixed;inset:0;z-index:70;background:var(--bg);overflow:auto;padding:12px 12px calc(24px + env(safe-area-inset-bottom));}
+.photo-meal-card{max-width:520px;margin:0 auto}
+.pm-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.pm-head b{font-size:18px;font-weight:800}
+.pm-list{margin:12px 0}
+.pm-row{margin:0 0 10px;padding:10px 12px;border-radius:12px;background:var(--surface-2);box-shadow:inset 0 0 0 1px var(--line)}
+.pm-row-h{display:flex;align-items:flex-start;gap:8px}
+.pm-row-h .nm{flex:1;min-width:0}
+.pm-row-h .nm b{display:block;font-size:15px;line-height:20px;font-weight:800;color:var(--ink-900)}
+.pm-row-h .nm span{display:block;font-size:12px;line-height:16px;color:var(--ink-500)}
+.pm-row-h .kcal{font-family:var(--font-num);font-weight:800;font-size:15px;color:var(--mint-700);white-space:nowrap;padding-top:2px}
+.pm-portions{margin-top:8px}
+.pm-src{margin-top:6px;font-size:11px}
+.pm-unmatched{box-shadow:inset 0 0 0 1px rgba(255,180,80,.45)}
+.pm-cands{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.pm-cand{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;min-height:44px;padding:8px 10px;border:0;border-radius:10px;background:var(--surface);color:var(--ink-900);font:inherit;text-align:left;cursor:pointer;box-shadow:inset 0 0 0 1px var(--line)}
+.pm-cand b{font-size:14px}
+.pm-cand span{font-size:12px;color:var(--mint-700);font-weight:700;white-space:nowrap}
+.pm-tot{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:12px 0;padding:10px 12px;border-radius:12px;background:var(--surface);box-shadow:inset 0 0 0 1.5px var(--mint-400)}
+.pm-tot b{font-size:18px;font-weight:800;color:var(--mint-700);font-family:var(--font-num)}
+.pm-tot span{font-size:13px;color:var(--ink-500)}
+@media(max-width:400px){
+  .register-row .btn-register,.register-row .btn-photo{min-height:46px;font-size:15px}
+}
