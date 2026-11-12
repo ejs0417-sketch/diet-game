@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.20 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색, 다음 식사 추천, 레시피 공유)
-const VERSION='0.4.20', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.21 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색, 다음 식사 추천, 레시피 공유)
+const VERSION='0.4.21', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
@@ -687,7 +687,7 @@ function ach(C){const icons=['👣','🎯','📉','💯','🏆','💚'];
  <div class="ach-grid">${ACH.map(a=>{const on=!!C.got[a[0]];
   return `<div class="ach-badge${on?' on':''}"><div class="ico">${on?a[3]:'?'}</div><div class="nm">${on?a[0]:'???'}</div><div class="ds">${on?a[1]:'아직 숨겨져 있어요'}</div><div class="xp">${on?C.got[a[0]].slice(5).replace('-','/')+' 달성 · +'+a[2]:'+'+a[2]+' XP'}</div></div>`;}).join('')}</div>
  </div>`;}
-function me(C){return topBar(C,'내정보')+`<div class="page">`+(window.DGAuth?DGAuth.accountCard():'')+makeMe(C)+infoCard(C)+vitCard()+(window.DGHealth?DGHealth.summaryCard():'')+backupCard()+(window.DGAuth?DGAuth.accountActions():'')+`<div class="muted" style="text-align:center;padding:4px 0 8px">다이어트 게임 ${VERSION} · 기획서 v3 규칙</div></div>`;}
+function me(C){return topBar(C,'내정보')+`<div class="page">`+(window.DGAuth?DGAuth.accountCard():'')+makeMe(C)+infoCard(C)+(window.DGCustomFoods?DGCustomFoods.cardHTML():'')+vitCard()+(window.DGHealth?DGHealth.summaryCard():'')+backupCard()+(window.DGAuth?DGAuth.accountActions():'')+`<div class="muted" style="text-align:center;padding:4px 0 8px">다이어트 게임 ${VERSION} · 기획서 v3 규칙</div></div>`;}
 function saveTdeeProfile(){
   const h=+$('#pH').value,b=$('#pB').value,s=$('#pS').value,a=+$('#pA').value;
   if(!(h>=100&&h<=250))return toast('키를 확인해 주세요');

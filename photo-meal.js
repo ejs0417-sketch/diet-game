@@ -1,4 +1,4 @@
-// 다이어트 게임 0.4.20 — 식사 사진 인식. 칼로리는 AI가 만들지 않고 음식 표 공식 값만 씁니다. 끼니는 사진 시각(서울), 배달 결제내역 지원.
+// 다이어트 게임 0.4.21 — 식사 사진 인식. 칼로리는 AI가 만들지 않고 음식 표 공식 값만 씁니다. 끼니는 사진 시각(서울), 배달 결제내역 지원.
 (function(root){
 const PROXY_URL='https://52-79-146-61.sslip.io/recognize';
 const PORTIONS=[{id:'little',label:'조금',mul:0.5},{id:'normal',label:'보통',mul:1},{id:'lots',label:'많이',mul:1.5}];
@@ -178,7 +178,7 @@ function whenLabel(when){
 const COOK_REST=/^(장)?조림$|^볶음$|^무침$|^구이$|^찜$|^탕$|^국$|^찌개$|^전골$|^전$|^부침$|^나물$|^튀김$|^조림$|^장조림$/;
 const MAX_EDGE=1024, JPEG_Q=0.85;
 
-function foods(){return (root.DGFoods&&DGFoods.FOODS)||[];}
+function foods(){return (root.DGCustomFoods&&DGCustomFoods.all())||((root.DGFoods&&DGFoods.FOODS)||[]);}
 function searchFoods(q,opts){return (root.DGFoodSearch&&DGFoodSearch.searchFoods(q,opts))||[];}
 function norm(s){return root.DGFoodSearch?DGFoodSearch.norm(s):String(s||'').toLowerCase().replace(/\s+/g,'');}
 function foodKeys(item){return [item.name].concat(item.aliases||[]).concat(item.searchAliases||[]).filter(Boolean);}
@@ -277,7 +277,8 @@ function matchDish(query){
       const cooked=isCookedVariant(q,key);
       if(cooked)s=Math.min(s,75);
       if(item.unit==='1인분')s+=2;
-      if(!best||s>best.score||(s===best.score&&norm(key).length>norm(best.via).length)){
+      const better=!best||s>best.score||(s===best.score&&!item.custom&&best.item.custom)||(s===best.score&&norm(key).length>norm(best.via).length);
+      if(better){
         best={item,score:s,via:key,cooked:cooked};
       }
     });
@@ -584,7 +585,7 @@ function rowHTML(r,i,place){
         <button type="button" class="icon-btn" aria-label="빼기" onclick="DGPhotoMeal.removeRow(${i})">✕</button></div>
       ${qtyBox}
       <div class="segmented pm-portions" role="tablist">${por}</div>
-      <div class="muted pm-src">단백질 ${nu.protein}g · ${esc(r.food.src? '음식 표 공식 값':'음식 표')}</div>
+      <div class="muted pm-src">단백질 ${nu.protein}g · ${r.food.custom?`인터넷 검색값${r.food.sourceUrl?` · <a href="${esc(r.food.sourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(r.food.sourceTitle||'출처')}</a>`:''}`:esc(r.food.src? '음식 표 공식 값':'음식 표')}</div>
     </div>`;
   }
   const cands=(r.candidates||[]).map(c=>{
@@ -592,9 +593,10 @@ function rowHTML(r,i,place){
     return `<button type="button" class="pm-cand" onclick="DGPhotoMeal.pickCandidate(${i},'${escJs(c.id)}')"><b>${esc(c.name)}</b><span>${n.kcal.toLocaleString('ko-KR')}kcal · ${esc(c.unit||'')}</span></button>`;
   }).join('');
   return `<div class="pm-row pm-unmatched">
-    <div class="pm-row-h"><span class="nm"><b>‘${esc(r.name)}’</b><span>음식 표에서 바로 맞는 메뉴가 없어요. 가까운 메뉴를 고르거나 빼 주세요.</span></span>
+    <div class="pm-row-h"><span class="nm"><b>‘${esc(r.name)}’</b><span>음식 표에서 바로 맞는 메뉴가 없어요. 가까운 메뉴를 고르거나, 인터넷에서 찾아 주세요.</span></span>
       <button type="button" class="icon-btn" aria-label="빼기" onclick="DGPhotoMeal.removeRow(${i})">✕</button></div>
-    <div class="pm-cands">${cands||'<div class="muted">가까운 메뉴가 없어요. 빼거나 검색으로 따로 등록해 주세요.</div>'}</div>
+    <div class="pm-cands">${cands||'<div class="muted">가까운 메뉴가 없어요.</div>'}</div>
+    <button type="button" class="btn-secondary" style="width:100%;margin-top:8px" onclick="DGCustomFoods.lookupForPhoto(${i})">인터넷에서 찾기</button>
   </div>`;
 }
 
@@ -663,7 +665,7 @@ function confirm(){
       value:nu.name+(qtyNote?' '+qtyNote:'')+(plab?' ('+plab+')':''),
       kcal:String(nu.kcal),
       protein_g:String(nu.protein),
-      kcal_source:'음식표',
+      kcal_source:r.food&&r.food.custom?('인터넷검색값'+(r.food.sourceUrl?(' '+r.food.sourceUrl):'')):'음식표',
       dish_id:nu.id,
       portion:mul,
       qty:r.qty||1,
@@ -726,12 +728,26 @@ function openWithReceipt(data,photoWhen){
   return state;
 }
 
+function getState(){return state;}
+function rowName(i){return state&&state.rows&&state.rows[i]&&state.rows[i].name||'';}
+function applyFood(i,food,mul){
+  if(!state||!state.rows[i]||!food)return;
+  const r=state.rows[i];
+  const sizeMul=(mul==null?1:+mul)||1;
+  r.food=food;
+  r.status='match';
+  r.candidates=[];
+  r.sizeMul=sizeMul;
+  r.portionMul=(r.qty||1)*sizeMul;
+  r.portion=sizeMul===0.5?'조금':sizeMul===1.5?'많이':'보통';
+  if(typeof renderConfirm==='function')renderConfirm();
+}
 const api={
   PROXY_URL,PORTIONS,MUL_OF,PHOTO_SLOTS,
   sanitizeDishes,sanitizeReceipt,scrubPii,matchDish,matchDishes,nutritionOf,totals,candidatesFor,
   parseJpegExifDate,parseExifAsciiDate,suggestMealSlotAt,seoulParts,readPhotoWhen,whenFromDate,whenLabel,
   pick,showChooser,closeChooser,recognizeFile,closeConfirm,showError,showLoading,clearError,prepareImage,setRowPortion,setRowQty,removeRow,pickCandidate,
-  setSlot,setDate,setPlace,confirm,openWithDishes,openWithReceipt,renderConfirm
+  setSlot,setDate,setPlace,confirm,openWithDishes,openWithReceipt,renderConfirm,getState,rowName,applyFood
 };
 root.DGPhotoMeal=api;
 if(typeof module!=='undefined'&&module.exports)module.exports=api;

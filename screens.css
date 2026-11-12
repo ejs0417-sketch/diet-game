@@ -434,3 +434,13 @@ html,body{background:var(--bg);color:var(--ink-700)}
 .pm-qty{display:flex;align-items:center;gap:10px;margin:8px 0}
 .pm-qty button{width:36px;height:36px;border-radius:10px;border:1.5px solid #333;background:#161616;color:#EDEDED;font-size:18px;font-weight:800}
 .pm-qty span{font-weight:800;min-width:2.5em;text-align:center}
+
+/* 0.4.21 인터넷에서 찾기 */
+.net-food-card{max-width:360px;text-align:left}
+.net-food-name{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:4px 0}
+.net-food-name span{color:var(--ink-500);font-size:13px}
+.net-food-kcal{font-size:22px;font-weight:800;color:var(--mint-400)}
+.net-food-src{display:flex;flex-direction:column;gap:4px;margin-top:8px;font-size:12px}
+.net-food-src a,.pm-src a{color:var(--mint-400);word-break:break-all}
+.custom-food-row{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:10px 0;border-top:1px solid #2A2A2A}
+.custom-food-acts{display:flex;flex-direction:column;gap:4px;flex:none}

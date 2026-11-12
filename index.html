@@ -3,32 +3,33 @@
 <meta name="theme-color" content="#121212">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-192.png"><title>다이어트 게임</title>
-<link rel="stylesheet" href="design-tokens.css?v=0.4.20">
-<link rel="stylesheet" href="screens.css?v=0.4.20">
+<link rel="stylesheet" href="design-tokens.css?v=0.4.21">
+<link rel="stylesheet" href="screens.css?v=0.4.21">
 </head><body>
 <div id="gate"></div>
 <main id="view"></main>
 <nav id="nav" class="tab-bar"></nav>
 <div class="toast" id="toast"></div>
-<script src="app.js?v=0.4.20"></script>
-<script src="auth.js?v=0.4.20"></script>
-<script src="health-ranges.js?v=0.4.20"></script>
-<script src="health.js?v=0.4.20"></script>
-<script src="supplements.js?v=0.4.20"></script>
-<script src="coach.js?v=0.4.20"></script>
-<script src="today-guide.js?v=0.4.20"></script>
-<script src="recipes.js?v=0.4.20"></script>
-<script src="home-workout.js?v=0.4.20"></script>
-<script src="delivery-foods.js?v=0.4.20"></script>
-<script src="food-search.js?v=0.4.20"></script>
-<script src="photo-meal.js?v=0.4.20"></script>
-<script src="delivery.js?v=0.4.20"></script>
-<script type="module" src="face.js?v=0.4.20"></script>
-<script type="module" src="avatar.js?v=0.4.20"></script>
+<script src="app.js?v=0.4.21"></script>
+<script src="auth.js?v=0.4.21"></script>
+<script src="health-ranges.js?v=0.4.21"></script>
+<script src="health.js?v=0.4.21"></script>
+<script src="supplements.js?v=0.4.21"></script>
+<script src="coach.js?v=0.4.21"></script>
+<script src="today-guide.js?v=0.4.21"></script>
+<script src="recipes.js?v=0.4.21"></script>
+<script src="home-workout.js?v=0.4.21"></script>
+<script src="delivery-foods.js?v=0.4.21"></script>
+<script src="custom-foods.js?v=0.4.21"></script>
+<script src="food-search.js?v=0.4.21"></script>
+<script src="photo-meal.js?v=0.4.21"></script>
+<script src="delivery.js?v=0.4.21"></script>
+<script type="module" src="face.js?v=0.4.21"></script>
+<script type="module" src="avatar.js?v=0.4.21"></script>
 <script>if('serviceWorker' in navigator){
   const hadController=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadController)location.reload();});
-  navigator.serviceWorker.register('sw.js?v=0.4.20',{updateViaCache:'none'}).then(reg=>{
+  navigator.serviceWorker.register('sw.js?v=0.4.21',{updateViaCache:'none'}).then(reg=>{
     const ping=()=>reg.update();
     ping();
     document.addEventListener('visibilitychange',()=>{if(!document.hidden)ping();});

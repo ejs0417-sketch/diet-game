@@ -39,7 +39,7 @@ const SEARCH_SYNONYMS={
 // 0.4.9: 이 별칭은 질의가 별칭 전체를 다 입력했을 때만 맞춰요. ('치킨' 검색에 별칭 '치킨랩' 때문에 샐러드랩이 섞이던 문제)
 const FULL_ONLY_ALIASES=new Set(['치킨랩']);
 
-function foods(){return (root.DGFoods&&DGFoods.FOODS)||[];}
+function foods(){return (root.DGCustomFoods&&DGCustomFoods.all())||((root.DGFoods&&DGFoods.FOODS)||[]);}
 
 function norm(s){
   return String(s||'').toLowerCase()
@@ -179,7 +179,7 @@ function searchFoods(query,opts){
     });
     if(best>=68)scored.push({item,score:best+unitBoost(item),via});
   });
-  scored.sort((a,b)=>b.score-a.score||(a.item.rank||99)-(b.item.rank||99)||a.item.name.length-b.item.name.length||String(a.item.name).localeCompare(b.item.name,'ko'));
+  scored.sort((a,b)=>b.score-a.score||(a.item.custom?1:0)-(b.item.custom?1:0)||(a.item.rank||99)-(b.item.rank||99)||a.item.name.length-b.item.name.length||String(a.item.name).localeCompare(b.item.name,'ko'));
   return scored.slice(0,limit);
 }
 
@@ -196,14 +196,16 @@ function escJs(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 
 function resultHTML(hits,query){
   if(!hits.length){
-    return `<div class="meal-search-hint">‘${esc(query)}’에 맞는 메뉴가 없어요. 이름을 직접 적어도 기록할 수 있어요.</div>`;
+    return `<div class="meal-search-hint">‘${esc(query)}’에 맞는 메뉴가 없어요. 이름을 직접 적어도 기록할 수 있어요.</div>
+      <button type="button" class="btn-secondary" style="width:100%;margin-top:8px" onclick="DGCustomFoods.lookupForSearch('${escJs(query)}')">인터넷에서 찾기</button>`;
   }
   return hits.map(h=>{
     const raw=h.item;
     const fn=(root.DGFoods&&DGFoods.nutritionForPlace);
     const f=fn?fn(raw,typeof mealPlace!=='undefined'?mealPlace:''):raw;
     const kcal=Math.round(+f.kcal||0);
-    const sub=[f.brand,f.cat,f.unit||'1인분'].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(' · ');
+    const tag=raw.custom?'인터넷 검색값 · ':'';
+    const sub=[tag+([f.brand,f.cat,f.unit||'1인분'].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(' · '))].filter(Boolean).join('');
     return `<button type="button" class="meal-search-item" data-food-id="${esc(f.id)}" onclick="DGFoodSearch.pick('${escJs(f.id)}')">
       <span class="nm"><b>${esc(f.name)}</b><span>${esc(sub)}</span></span>
       <span class="kcal"><span class="num">${kcal.toLocaleString('ko-KR')}</span>kcal</span>
