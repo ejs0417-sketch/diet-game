@@ -1,4 +1,4 @@
-// 0.4.18 예상 체중·다음 식사 추천·내일 식단 레시피·홈트 단계 진도
+// 0.4.19 예상 체중·다음 식사 추천·내일 식단 레시피·홈트 단계 진도
 const fs = require('fs');
 const vm = require('vm');
 const assert = require('assert');
@@ -107,7 +107,7 @@ W.stepDown();
 assert.strictEqual(W.state().stage, 1, '1단계 아래로 안 내려감');
 W.setStage(5);
 assert.strictEqual(W.state().stage, 2, '해금 안 된 단계는 못 감');
-assert.strictEqual(vm.runInContext('VERSION', ctx), '0.4.18');
+assert.strictEqual(vm.runInContext('VERSION', ctx), '0.4.19');
 
 const st1 = W.stageOf(1);
 assert.ok(st1.moves.length >= 4);

@@ -1,4 +1,4 @@
-// 다이어트 게임 0.4.8 — 배달 주문 사진 인식·나눠 먹기·남은 음식·메뉴 검색 연결 (기기 안, 사진은 저장하지 않음)
+// 다이어트 게임 0.4.19 — 배달 결제내역은 사진 등록과 같은 프록시 흐름(가게·메뉴·수량·주문 시각만). 주소·전화·카드·주문번호·결제는 버림.
 (function(root){
 const DISCLAIMER='건강 정보는 참고용이에요. 진단이 아니며, 정확한 판단은 의사에게 받으세요.';
 const PRIVACY='사진은 이 폰 안에서만 읽고, 어디에도 올리지 않아요. 인식이 끝나면 사진을 저장하지 않아요.';
@@ -618,6 +618,9 @@ function openFromSearch(id){
 }
 
 function pick(){
+  if(root.DGPhotoMeal&&typeof DGPhotoMeal.pick==='function'){
+    return DGPhotoMeal.pick({mode:'receipt',skipChooser:true});
+  }
   let inp=$('#delivPick');
   if(!inp){inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.id='delivPick';inp.style.display='none';
     inp.onchange=()=>{const f=inp.files&&inp.files[0];inp.value='';if(f)importFile(f);};
@@ -629,6 +632,9 @@ async function importFile(file){
   if(!file)return;
   if(file.type&&!file.type.startsWith('image/')&&!/\.(png|jpe?g|webp|gif|heic)$/i.test(file.name||'')){
     if(typeof toast==='function')toast('주문 사진(이미지)만 불러올 수 있어요');return;
+  }
+  if(root.DGPhotoMeal&&typeof DGPhotoMeal.recognizeFile==='function'){
+    return DGPhotoMeal.recognizeFile(file,{mode:'receipt'});
   }
   openPane({mode:'busy',msg:'사진을 이 폰 안에서 읽고 있어요. 어디에도 올리지 않고, 끝나면 사진을 남기지 않아요.'});
   let text='',ocrError=false;

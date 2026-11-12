@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.18 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색, 다음 식사 추천, 레시피 공유)
-const VERSION='0.4.18', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.19 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색, 다음 식사 추천, 레시피 공유)
+const VERSION='0.4.19', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
@@ -371,7 +371,7 @@ function todayFuelHTML(C){
   </section>`;
 }
 function homeQuickHTML(){
-  const extra=(vitButtons(today())||'')+(window.DGDelivery?`<div style="margin-top:8px"><button type="button" class="btn-secondary" style="width:100%" onclick="DGDelivery.pick()">📷 배달 주문 사진으로 기록</button>${DGDelivery.chipsHTML(compute())}</div>`:'');
+  const extra=(vitButtons(today())||'')+(window.DGDelivery?`<div style="margin-top:8px"><button type="button" class="btn-secondary" style="width:100%" onclick="DGDelivery.pick()">🧾 배달 결제내역으로 등록</button>${DGDelivery.chipsHTML(compute())}</div>`:'');
   return `<div class="card home-quick" id="homeQuick">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><h3 style="margin:0">빠른 기록</h3></div>
     <div class="register-row" style="margin-top:0">
@@ -379,7 +379,7 @@ function homeQuickHTML(){
       <button type="button" class="btn-secondary btn-lg btn-photo" onclick="tab='log';logKind='meal';logAdding=false;render();setTimeout(()=>{if(window.DGPhotoMeal)DGPhotoMeal.pick();},50)">사진으로 등록</button>
     </div>
     <div class="quick" style="margin-top:10px">${quick()}</div>
-    <details class="home-more"><summary>비타민 · 배달 사진</summary>${extra}</details>
+    <details class="home-more"><summary>비타민 · 배달 결제내역</summary>${extra}</details>
   </div>`;
 }
 function questHomeHTML(qs){
@@ -594,7 +594,7 @@ function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0
    <div class="rowx" style="margin-bottom:14px"><label class="field"><span class="label">kcal <span class="muted">(선택)</span></span><input class="input" id="kcal" type="number" placeholder="예: 520" inputmode="numeric"></label>
    <label class="field"><span class="label">단백질 g <span class="muted">(선택)</span></span><input class="input" id="prot" type="number" placeholder="예: 40" inputmode="numeric"></label></div>
    <button type="button" class="btn-primary btn-lg" onclick="sub('meal')">식사 기록하기 <span class="stat-chip gold" style="min-height:26px;padding:0 8px;font-size:12px;box-shadow:none">+5 XP</span></button>
-   <button type="button" class="btn-secondary" style="width:100%;margin-top:8px" onclick="DGDelivery.pick()">📷 배달 주문 사진으로 기록</button>
+   <button type="button" class="btn-secondary" style="width:100%;margin-top:8px" onclick="DGDelivery.pick()">🧾 배달 결제내역으로 등록</button>
    ${(window.DGDelivery?DGDelivery.chipsHTML(C):'')}`,
   exercise:`<div class="segmented" data-seg="ex" style="margin-bottom:12px" role="tablist"><button type="button" data-k="걷기" aria-selected="true" onclick="this.parentNode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-selected',b===this));this.parentNode.dataset.v='걷기'">걷기</button><button type="button" data-k="근력" aria-selected="false" onclick="this.parentNode.querySelectorAll('button').forEach(b=>b.setAttribute('aria-selected',b===this));this.parentNode.dataset.v='근력'">근력</button></div>
    <label class="field" style="margin-bottom:14px"><span class="label">시간(분)</span><input class="input" id="min" type="number" placeholder="예: 40" inputmode="numeric"></label>

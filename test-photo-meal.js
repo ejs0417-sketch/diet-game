@@ -1,4 +1,4 @@
-// 0.4.18 사진 인식: 음식 표 매칭, 공식 영양만 사용, AI kcal 무시
+// 0.4.19 사진 인식: 음식 표 매칭, 공식 영양만 사용, AI kcal 무시
 const assert=require('assert');
 const vm=require('vm');
 const fs=require('fs');
@@ -52,8 +52,8 @@ const dirty={dishes:[
   {name:'달걀전',portion:'많이',kcal:5000}
 ]};
 const clean=PM.sanitizeDishes(dirty);
-assert.deepStrictEqual(clean.map(d=>Object.keys(d).sort()),clean.map(()=>['name','portion'].sort()));
-assert.ok(clean.every(d=>d.kcal==null&&d.calories==null));
+assert.deepStrictEqual(clean.map(d=>Object.keys(d).sort()),clean.map(()=>['name','portion','qty'].sort()));
+assert.ok(clean.every(d=>d.kcal==null&&d.calories==null&&d.protein==null&&d.qty===1));
 const rows=PM.matchDishes(dirty);
 const rice=rows[0];
 assert.strictEqual(rice.food.id,'rice');
@@ -80,6 +80,49 @@ assert.strictEqual(tot.kcal,nu.kcal+nu2.kcal+nu3.kcal);
 assert.ok(tot.kcal<9999);
 assert.notStrictEqual(nu3.kcal,5000);
 
+
+
+// 0.4.19 끼니: 사진 EXIF(서울) 우선, 현재 시각(밤에 야식)은 쓰지 않음
+assert.strictEqual(PM.suggestMealSlotAt(new Date('2026-11-12T12:24:59+09:00')),'점심');
+assert.strictEqual(PM.suggestMealSlotAt(new Date('2026-11-12T22:07:00+09:00')),'야식');
+assert.strictEqual(PM.suggestMealSlotAt(new Date('2026-11-12T08:10:00+09:00')),'아침');
+assert.strictEqual(PM.suggestMealSlotAt(new Date('2026-11-12T16:00:00+09:00')),'간식');
+assert.strictEqual(PM.suggestMealSlotAt(new Date('2026-11-12T18:30:00+09:00')),'저녁');
+assert.strictEqual(PM.suggestMealSlotAt(new Date('2026-11-12T20:59:00+09:00')),'저녁');
+assert.strictEqual(PM.suggestMealSlotAt(new Date('2026-11-12T21:00:00+09:00')),'야식');
+const exifJpeg=Buffer.from('/9j/4AAQSkZJRgABAQAAAQABAAD/4QCcRXhpZgAATU0AKgAAAAgAAgEyAAIAAAAUAAAAJodpAAQAAAABAAAAOgAAAAAyMDI2OjExOjEyIDEyOjI0OjU5AAADkAMAAgAAABQAAABkkAQAAgAAABQAAAB4kBEAAgAAAAcAAACMAAAAADIwMjY6MTE6MTIgMTI6MjQ6NTkAMjAyNjoxMToxMiAxMjoyNDo1OQArMDk6MDAAAP/bAEMABQMEBAQDBQQEBAUFBQYHDAgHBwcHDwsLCQwRDxISEQ8RERMWHBcTFBoVEREYIRgaHR0fHx8TFyIkIh4kHB4fHv/bAEMBBQUFBwYHDggIDh4UERQeHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHv/AABEIABAAEAMBIgACEQEDEQH/xAAfAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgv/xAC1EAACAQMDAgQDBQUEBAAAAX0BAgMABBEFEiExQQYTUWEHInEUMoGRoQgjQrHBFVLR8CQzYnKCCQoWFxgZGiUmJygpKjQ1Njc4OTpDREVGR0hJSlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4eLj5OXm5+jp6vHy8/T19vf4+fr/xAAfAQADAQEBAQEBAQEBAAAAAAAAAQIDBAUGBwgJCgv/xAC1EQACAQIEBAMEBwUEBAABAncAAQIDEQQFITEGEkFRB2FxEyIygQgUQpGhscEJIzNS8BVictEKFiQ04SXxFxgZGiYnKCkqNTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqCg4SFhoeIiYqSk5SVlpeYmZqio6Slpqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2dri4+Tl5ufo6ery8/T19vf4+fr/2gAMAwEAAhEDEQA/AMSiiivz8/ZT/9k=','base64');
+const exifDate=PM.parseJpegExifDate(new Uint8Array(exifJpeg));
+assert.ok(exifDate);
+assert.strictEqual(PM.seoulParts(exifDate).date,'2026-11-12');
+assert.strictEqual(PM.seoulParts(exifDate).time,'12:24');
+assert.strictEqual(PM.suggestMealSlotAt(exifDate),'점심');
+
+// 배달 결제내역: 주소·전화·카드·주문번호·결제 정보는 버림
+const dirtyReceipt={
+  store:'테스트치킨 서울시 테스트구 가상로 1 010-0000-0000',
+  address:'서울시 테스트구 가상로 1',
+  phone:'010-0000-0000',
+  card:'1234-5678-9012-3456',
+  order_number:'B0123456789',
+  payment:'22,000원',
+  ordered_at:'2026-11-12 12:30',
+  items:[{name:'후라이드 치킨 한마리 22,000원 010-1111-2222',qty:1},{name:'콜라',qty:2}]
+};
+const rec=PM.sanitizeReceipt(dirtyReceipt);
+const recJson=JSON.stringify(rec);
+assert.strictEqual(rec.store,'테스트치킨');
+assert.ok(rec.ordered_at.indexOf('2026-11-12T12:30')===0);
+assert.ok(!/010-|1234-5678|B012345|가상로|22,000|address|phone|card|order_number|payment/.test(recJson));
+assert.strictEqual(rec.items[0].name,'후라이드 치킨 한마리');
+assert.strictEqual(idOf('후라이드 치킨 한마리'),'fried-w');
+const recRows=PM.matchDishes(rec.items);
+assert.strictEqual(recRows[0].food.id,'fried-w');
+assert.strictEqual(recRows[0].qty,1);
+assert.strictEqual(PM.nutritionOf(recRows[0].food,recRows[0].portionMul).kcal,foods.find(f=>f.id==='fried-w').kcal);
+assert.strictEqual(recRows[1].qty,2);
+assert.ok(!rec.payment&&rec.address==null);
+
+console.log('photo-meal 0.4.19 slot/receipt tests ok',{exif:'12:24 점심',store:rec.store});
 
 // 프록시 URL에 키가 없고 github.io 공개 저장소 값을 쓰지 않음
 assert.ok(/^https:\/\/52-79-146-61\.sslip\.io\//.test(PM.PROXY_URL));
