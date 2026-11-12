@@ -1,4 +1,4 @@
-// 0.4.19 사진 인식: 음식 표 매칭, 공식 영양만 사용, AI kcal 무시
+// 0.4.20 사진 인식: 음식 표 매칭, 공식 영양만 사용, AI kcal 무시
 const assert=require('assert');
 const vm=require('vm');
 const fs=require('fs');

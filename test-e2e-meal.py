@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""0.4.19 E2E: home coach cards, body morph 0/50/100, franchise search, version badge, 집밥, consecutive search, short viewport, SW update."""
+"""0.4.20 E2E: home coach cards, body morph 0/50/100, franchise search, version badge, 집밥, consecutive search, short viewport, SW update."""
 from __future__ import annotations
 import http.server, json, os, socket, sys, threading, time
 from functools import partial
@@ -7,7 +7,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parent
-SHOT_DIR = Path('/tmp/e2e-0.4.19')
+SHOT_DIR = Path('/tmp/e2e-0.4.20')
 FINAL_SHOT = Path('/workspace/다이어트게임-0.4.15-집밥선택.png')
 HOME_SHOT = Path('/workspace/다이어트게임-0.4.15-버전표시.png')
 FRUIT_SHOT = Path('/workspace/다이어트게임-0.4.15-과일검색.png')
@@ -205,10 +205,10 @@ def main():
             browser,ctx,page=launch(p,412,915)
             guest(page,url)
             ver=page.evaluate('()=>typeof VERSION!=="undefined"?VERSION:null')
-            if ver!='0.4.19':
-                FAILS.append(f'로컬 버전이 0.4.19가 아님: {ver}')
+            if ver!='0.4.20':
+                FAILS.append(f'로컬 버전이 0.4.20가 아님: {ver}')
             badge=page.locator('.ver-badge')
-            if badge.count()==0 or 'v0.4.19' not in badge.first.inner_text():
+            if badge.count()==0 or 'v0.4.20' not in badge.first.inner_text():
                 FAILS.append(f'홈 버전 배지 없음: {badge.count()}')
             page.wait_for_timeout(400)
             page.screenshot(path=str(HOME_SHOT))
@@ -216,7 +216,7 @@ def main():
             page.evaluate('()=>window.scrollTo(0,0)')
             page.screenshot(path='/workspace/다이어트게임-0.4.15-홈.png')
             log('SHOT', '/workspace/다이어트게임-0.4.15-홈.png')
-            # 0.4.19 홈에는 필수만, 예상 체중·내일 식단·홈트는 코칭 탭
+            # 0.4.20 홈에는 필수만, 예상 체중·내일 식단·홈트는 코칭 탭
             for sel,msg in (
                 ('#fuelCard','홈 오늘 식사 카드'),
                 ('#homeQuick','홈 빠른 기록'),
@@ -232,9 +232,9 @@ def main():
             if page.locator('#dinnerCard').count():
                 page.locator('#dinnerCard').first.scroll_into_view_if_needed()
                 page.wait_for_timeout(200)
-                page.locator('#dinnerCard').first.screenshot(path='/workspace/다이어트게임-0.4.19-다음식사추천.png')
+                page.locator('#dinnerCard').first.screenshot(path='/workspace/다이어트게임-0.4.20-다음식사추천.png')
                 page.locator('#dinnerCard').first.screenshot(path='/workspace/다이어트게임-0.4.15-저녁추천.png')
-                log('SHOT', '/workspace/다이어트게임-0.4.19-다음식사추천.png')
+                log('SHOT', '/workspace/다이어트게임-0.4.20-다음식사추천.png')
             page.locator('nav#nav button', has_text='코칭').click()
             page.wait_for_timeout(400)
             if page.locator('nav#nav button', has_text='코칭').count()==0:
@@ -255,8 +255,8 @@ def main():
             if page.locator('#workoutCard').count():
                 page.locator('#workoutCard').first.screenshot(path='/workspace/다이어트게임-0.4.15-홈트카드.png')
             if page.locator('#nextDayCard').count():
-                page.locator('#nextDayCard').first.screenshot(path='/workspace/다이어트게임-0.4.19-내일식단레시피.png')
-                log('SHOT', '/workspace/다이어트게임-0.4.19-내일식단레시피.png')
+                page.locator('#nextDayCard').first.screenshot(path='/workspace/다이어트게임-0.4.20-내일식단레시피.png')
+                log('SHOT', '/workspace/다이어트게임-0.4.20-내일식단레시피.png')
             # 홈트 오버레이가 render에 안 지워지는지 연 뒤 닫기
             if page.locator('#workoutCard').count():
                 page.locator('#workoutCard button', has_text='이 단계 시작').click()
@@ -271,10 +271,10 @@ def main():
             open_log_tab(page)
             if page.locator('#eatenToday').count()==0 and page.locator('#mealRegisterBtn').count()==0:
                 FAILS.append('기록 탭에 오늘 먹은 것/등록하기 없음')
-            if page.locator('.log-head .ver-badge', has_text='v0.4.19').count()==0:
+            if page.locator('.log-head .ver-badge', has_text='v0.4.20').count()==0:
                 FAILS.append('기록 헤더 버전 배지 없음')
-            page.screenshot(path='/workspace/다이어트게임-0.4.19-오늘먹은것.png')
-            log('SHOT', '/workspace/다이어트게임-0.4.19-오늘먹은것.png')
+            page.screenshot(path='/workspace/다이어트게임-0.4.20-오늘먹은것.png')
+            log('SHOT', '/workspace/다이어트게임-0.4.20-오늘먹은것.png')
             page.screenshot(path='/workspace/다이어트게임-0.4.15-기록.png')
             open_composer(page)
             assert_search_visible(page, 'fresh-nav enter', 'fresh-nav-enter')
@@ -434,9 +434,9 @@ def main():
             add_three(page, 'slot-점저', '점저')
             browser.close()
 
-            # 7) SW 0.4.10 캐시: 첫 기록은 홈으로 나감(옛 버그). 서버를 0.4.19로 바꾼 뒤
+            # 7) SW 0.4.10 캐시: 첫 기록은 홈으로 나감(옛 버그). 서버를 0.4.20로 바꾼 뒤
             #    update()를 시도하고, 0.4.10 페이지에는 자동새로고침이 없으므로
-            #    한 번 새로고침(앱을 다시 연 것과 같음, network-first) 후 0.4.19 연속 추가를 확인.
+            #    한 번 새로고침(앱을 다시 연 것과 같음, network-first) 후 0.4.20 연속 추가를 확인.
             httpd.legacy = True
             browser,ctx,page=launch(p,412,915)
             guest(page, url)
@@ -459,7 +459,7 @@ def main():
             except Exception as e:
                 log('update() call', type(e).__name__, e)
             try:
-                page.wait_for_function('() => typeof VERSION!=="undefined" && VERSION==="0.4.19"', timeout=4000)
+                page.wait_for_function('() => typeof VERSION!=="undefined" && VERSION==="0.4.20"', timeout=4000)
             except Exception:
                 page.reload(wait_until='domcontentloaded', timeout=20000)
             page.wait_for_timeout(500)
@@ -469,8 +469,8 @@ def main():
             ver2=page.evaluate('()=>typeof VERSION!=="undefined"?VERSION:null')
             log('SW after update/reload VERSION', ver2)
             page.screenshot(path=str(SHOT_DIR/'sw-updated-home.png'))
-            if ver2!='0.4.19':
-                FAILS.append(f'SW 업데이트 후 버전이 0.4.19가 아님: {ver2}')
+            if ver2!='0.4.20':
+                FAILS.append(f'SW 업데이트 후 버전이 0.4.20가 아님: {ver2}')
             else:
                 deadline=time.time()+12
                 while time.time()<deadline:
@@ -486,11 +486,11 @@ def main():
                 open_log_tab(page)
                 open_composer(page)
                 st=assert_search_visible(page, 'sw-updated enter', 'sw-updated-enter')
-                if st.get('version')!='0.4.19' or not st.get('inView'):
+                if st.get('version')!='0.4.20' or not st.get('inView'):
                     FAILS.append(f'sw-updated 기록 화면 검색창 확인 실패 {st}')
             browser.close()
 
-            # 8) 0.4.19 전용 세션에서 sw.js 내용이 바뀌면 자동 새로고침
+            # 8) 0.4.20 전용 세션에서 sw.js 내용이 바뀌면 자동 새로고침
             httpd.legacy = False
             httpd.sw_bump = False
             browser,ctx,page=launch(p,412,915)
@@ -506,20 +506,20 @@ def main():
                     page.wait_for_selector('nav#nav', timeout=20000)
                 ver3=page.evaluate('()=>typeof VERSION!=="undefined"?VERSION:null')
                 log('SW bump auto-reload VERSION', ver3)
-                if ver3!='0.4.19':
-                    FAILS.append(f'0.4.19 자동새로고침 후 버전 이상: {ver3}')
+                if ver3!='0.4.20':
+                    FAILS.append(f'0.4.20 자동새로고침 후 버전 이상: {ver3}')
                 else:
                     log('SW bump auto-reload OK')
             except Exception as e:
                 log('SW bump auto-nav', type(e).__name__, e)
-                log('WARN: 0.4.19 자동새로고침이 이 환경에서 확인되지 않음 (코드는 index.html controllerchange + sw navigate 유지)')
+                log('WARN: 0.4.20 자동새로고침이 이 환경에서 확인되지 않음 (코드는 index.html controllerchange + sw navigate 유지)')
             browser.close()
 
             # 9) 목표 체형 미리보기 0/50/100% (5단계 GLB, 반투명 겹침 없음)
             BODY0=Path('/workspace/다이어트게임-0.4.15-체형0.png')
             BODY50=Path('/workspace/다이어트게임-0.4.15-체형50.png')
             BODY100=Path('/workspace/다이어트게임-0.4.15-체형100.png')
-            BODY16={0:Path('/workspace/다이어트게임-0.4.19-체형0.png'),0.25:Path('/workspace/다이어트게임-0.4.19-체형25.png'),0.5:Path('/workspace/다이어트게임-0.4.19-체형50.png'),0.75:Path('/workspace/다이어트게임-0.4.19-체형75.png'),1:Path('/workspace/다이어트게임-0.4.19-체형100.png')}
+            BODY16={0:Path('/workspace/다이어트게임-0.4.20-체형0.png'),0.25:Path('/workspace/다이어트게임-0.4.20-체형25.png'),0.5:Path('/workspace/다이어트게임-0.4.20-체형50.png'),0.75:Path('/workspace/다이어트게임-0.4.20-체형75.png'),1:Path('/workspace/다이어트게임-0.4.20-체형100.png')}
             browser,ctx,page=launch(p,412,915)
             guest(page,url)
             page.locator('nav#nav button', has_text='내정보').click()
@@ -557,7 +557,7 @@ def main():
             log(' -', f)
         sys.exit(1)
     extra=[Path('/workspace/다이어트게임-0.4.15-홈트.png'), Path('/workspace/다이어트게임-0.4.15-예상체중.png'), Path('/workspace/다이어트게임-0.4.15-저녁추천.png'), Path('/workspace/다이어트게임-0.4.15-체형0.png'), Path('/workspace/다이어트게임-0.4.15-체형50.png'), Path('/workspace/다이어트게임-0.4.15-체형100.png'),
-           Path('/workspace/다이어트게임-0.4.19-오늘먹은것.png'), Path('/workspace/다이어트게임-0.4.19-다음식사추천.png'), Path('/workspace/다이어트게임-0.4.19-내일식단레시피.png')]
+           Path('/workspace/다이어트게임-0.4.20-오늘먹은것.png'), Path('/workspace/다이어트게임-0.4.20-다음식사추천.png'), Path('/workspace/다이어트게임-0.4.20-내일식단레시피.png')]
     missing=[p for p in (FINAL_SHOT, HOME_SHOT, FRUIT_SHOT, CHICKEN_PIZZA_SHOT, *extra) if not p.exists()]
     if missing:
         log('E2E FAIL: 스크린샷 없음', *[str(p) for p in missing])

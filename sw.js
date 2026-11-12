@@ -1,9 +1,9 @@
-const V='dg-0.4.19';
+const V='dg-0.4.20';
 const FILES=['./','index.html','app.js','auth.js','health.js','health-ranges.js','supplements.js','coach.js','today-guide.js','recipes.js','home-workout.js','delivery-foods.js','food-search.js','photo-meal.js','delivery.js','char.png','icon-192.png','icon-512.png','manifest.webmanifest','face.js','avatar.js','vendor/three.custom.min.js','assets/avatar/char-current-0.4.9.glb','assets/avatar/char-goal-0.4.9.glb','assets/avatar/char-00-0.4.15.glb','assets/avatar/char-25-0.4.15.glb','assets/avatar/char-50-0.4.15.glb','assets/avatar/char-75-0.4.15.glb','assets/avatar/char-100-0.4.15.glb','design-tokens.css','screens.css','vendor/fonts/PretendardVariable.woff2','vendor/fonts/Lexend-latin.woff2','vendor/pdfjs/pdf.min.mjs','vendor/pdfjs/pdf.worker.min.mjs'];
 self.addEventListener('install',e=>{
   e.waitUntil((async()=>{
     const c=await caches.open(V);
-    FILES.forEach(f=>c.add(f).catch(()=>{}));
+    FILES.forEach(f=>c.add(new Request(f,{cache:'no-cache'})).catch(()=>{}));
     await self.skipWaiting();
   })());
 });
@@ -35,5 +35,6 @@ self.addEventListener('fetch',e=>{
   }
   if(u.origin!==location.origin){e.respondWith(fetch(e.request));return;}
   if(e.request.method!=='GET'){e.respondWith(fetch(e.request));return;}
-  e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(V).then(x=>x.put(e.request,c));return r;}).catch(()=>caches.match(e.request)));
+  // GitHub Pages는 max-age=600이라 기본 fetch면 최대 10분 동안 옛 JS를 줍니다. 같은 출처 GET은 HTTP 캐시를 건너뜁니다.
+  e.respondWith(fetch(new Request(e.request,{cache:'no-cache'})).then(r=>{const c=r.clone();caches.open(V).then(x=>x.put(e.request,c));return r;}).catch(()=>caches.match(e.request)));
 });
