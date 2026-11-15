@@ -107,7 +107,7 @@ W.stepDown();
 assert.strictEqual(W.state().stage, 1, '1단계 아래로 안 내려감');
 W.setStage(5);
 assert.strictEqual(W.state().stage, 2, '해금 안 된 단계는 못 감');
-assert.strictEqual(vm.runInContext('VERSION', ctx), '0.4.23');
+assert.strictEqual(vm.runInContext('VERSION', ctx), '0.4.24');
 
 const st1 = W.stageOf(1);
 assert.ok(st1.moves.length >= 4);

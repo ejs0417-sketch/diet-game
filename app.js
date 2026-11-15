@@ -1,5 +1,5 @@
-// 다이어트 게임 0.4.23 — 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색, 다음 식사 추천, 레시피 공유)
-const VERSION='0.4.23', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
+// 다이어트 게임 0.4.24 — 헬스장 4주 계획 추가 · 기획서 v3 규칙 (예측 공식 건강관리 확인됨, 3D 아바타, 구글 로그인, 영양제·코치·배달, 대표 메뉴 검색, 다음 식사 추천, 레시피 공유)
+const VERSION='0.4.24', START_DATE='2026-11-10', START_W=113.0, MONTH_END='2026-12-10';
 const KEY='dg_raw_v1', SKEY='dg_settings_v1';
 const MEALS=['아침','점심','저녁'];
 const MEAL_SLOTS=['아침','아점','점심','점저','저녁','간식','야식'];
@@ -116,14 +116,15 @@ function compute(T){
  const rows=[],status=[],days={},got={},stages={};let streak=0,lastW=null,strW={},lastAvg=START_W,good=0,walkDays=0,vitStreak=0,lastVit=null;
  const wByWeek={},lowWeek={},weekly={};let flatWeeks=0,boss=null,bossHist=[],notice=null;
  let pred=START_W,curW=START_W,bmrWk=null,bmrW=START_W,bmr=mifflin(START_W,START_DATE),lastSeenW=null;
+ let gymStreak=0;const FIT=(typeof DGFitness!=='undefined')?DGFitness:null;
  const award=(d,name,note,xp)=>{if(got[name])return;const a=ACH.find(x=>x[0]===name);got[name]=d;const r={date:d,type:'achievement',item:name,value:'',xp:xp??a[2],note:note||''};rows.push(r);return r;};
  const stage=(d,avg,isDeadlineCheck)=>{LADDER.forEach(([kg,xp,title],i)=>{if(stages[i]||avg>kg)return;if(i===1&&d>MONTH_END)return;if(isDeadlineCheck&&i!==1)return;
    stages[i]=d;rows.push({date:d,type:'milestone',item:`${i+1}단계 ${title}`,value:kg,xp,note:`avg=${avg.toFixed(2)}`});
    if(i===1)award(d,'한 달 최소 목표','2단계와 같음',0);});};
  for(let n=Math.min(dn(first),dn(START_DATE));n<=dn(T);n++){
   const d=ds(n),es=evs.filter(e=>e.date===d),wk=week(d);
-  const info={weight:null,meals:{},kcal:0,prot:0,sodium:0,missingKcal:0,mealCount:0,walk:0,strength:0,strMin:0,rest:false,water:0,warn:false,bonus:0,closed:false,vit:{},vitXp:0,hq:{},hqXp:0};
-  days[d]=info;const mealRows=[],habit=[];let seenMeal={},cumWalk=0;
+  const info={weight:null,meals:{},kcal:0,prot:0,sodium:0,missingKcal:0,mealCount:0,walk:0,strength:0,strMin:0,rest:false,water:0,warn:false,bonus:0,closed:false,vit:{},vitXp:0,hq:{},hqXp:0,gym:{},gymMin:0,gymKcal:0,gymNet:0,gymDone:false,gymStreak:0};
+  days[d]=info;const mealRows=[],habit=[],gymHabit=[];let seenMeal={},cumWalk=0;
   for(const e of es){
    const r={date:d,type:e.type,item:e.item,value:e.value,xp:0,kcal:e.kcal||'',protein_g:e.protein_g||'',kcal_source:e.kcal_source||'',note:e.note||'',id:e.id};
    if(e.type==='weight'){if(info.weight===null){info.weight=+e.value;curW=info.weight;r.xp=10;habit.push(r);}}
@@ -133,6 +134,8 @@ function compute(T){
    else if(e.type==='exercise'&&e.item==='걷기'){const m=+e.value||0;r.xp=walkXp(cumWalk+m)-walkXp(cumWalk);cumWalk+=m;info.walk=cumWalk;habit.push(r);}
    else if(e.type==='exercise'&&e.item==='근력'){info.strMin+=(+e.value>0?+e.value:STR_DEFAULT_MIN);if(!info.strength){info.strength=1;strW[wk]=(strW[wk]||0)+1;if(strW[wk]<=3){r.xp=15;habit.push(r);}if(strW[wk]===2)award(d,'근력 스타트');}}
    else if(e.type==='rest'){info.rest=true;}
+   else if(e.type==='gym'){if(!e.item||info.gym[e.item]!=null)continue;const m=+e.value>0?+e.value:0;const it=FIT&&FIT.itemOf(d,e.item);const met=+e.met||(it?it.met:3.5);
+     info.gym[e.item]=m;info.gymMin+=m;info.gymKcal+=met*curW*m/60;info.gymNet+=Math.max(0,met-1)*curW*m/60;r.kcal=String(Math.round(met*curW*m/60));r.xp=FIT?FIT.XP_ITEM:5;gymHabit.push(r);}
    else if(e.type==='water'){const before=info.water;info.water=+(info.water+(+e.value||0)).toFixed(2);if(before<2&&info.water>=2){r.xp=5;habit.push(r);}}
    else if(e.type==='vitamin'){if(e.item&&!info.vit[e.item]){info.vit[e.item]=1;const unit=(e.need==='1'||e.value==='need')?7:5;const left=15-info.vitXp;r.xp=Math.max(0,Math.min(unit,left));info.vitXp+=r.xp;}}
    else if(e.type==='health_quest'){if(e.item&&!info.hq[e.item]){info.hq[e.item]=1;const unit=(typeof DGHealth!=='undefined'&&DGHealth.HQ_XP&&DGHealth.HQ_XP[e.item])||5;const left=30-info.hqXp;r.xp=Math.max(0,Math.min(unit,left));info.hqXp+=r.xp;}}
@@ -147,8 +150,18 @@ function compute(T){
    else{let b=0;if(k<=2000&&p>=130)b=20;else if(k<=2000&&p>=100)b=10;else if(k<=2300&&p>=130)b=10;cr.xp=b;info.bonus=b;habit.push(cr);
     if(k<=2000&&p>=130){good++;if(good===7)award(d,'식단 지킴이');}}}
   // 일일 퀘스트
-  info.q=[info.weight!==null,info.closed&&info.mealCount>0,info.walk>=40||info.rest,info.water>=2];
+  // 헬스 계획: 하루 완료·연속 보너스 (일요일은 연속을 끊지 않음, 오늘 미완료도 끊지 않음)
+  if(FIT){const p=FIT.planFor(d);
+   if(p&&!p.rest){if(FIT.dayComplete(d,info.gym)){info.gymDone=true;gymStreak++;
+      const r={date:d,type:'gym',item:'헬스완료',value:p.week+'주차',xp:FIT.XP_DAY,note:'하루 운동 완료'};rows.push(r);gymHabit.push(r);
+      const sb=gymStreak>=6?FIT.XP_STREAK6:gymStreak>=3?FIT.XP_STREAK3:0;
+      if(sb){const r2={date:d,type:'gym',item:'헬스연속',value:gymStreak,xp:sb,note:gymStreak+'일 연속'};rows.push(r2);gymHabit.push(r2);}}
+     else if(d!==T)gymStreak=0;}
+   info.gymStreak=gymStreak;}
+  info.gymKcal=Math.round(info.gymKcal);info.gymNet=Math.round(info.gymNet);
+  info.q=[info.weight!==null,info.closed&&info.mealCount>0,info.walk>=40||info.rest||info.gymDone,info.water>=2];
   if(info.q.every(Boolean)){const r={date:d,type:'quest',item:'일일퀘스트',value:'',xp:20,note:''};rows.push(r);habit.push(r);}
+  habit.push(...gymHabit);
   // 습관 XP 하루 상한
   let sum=0;for(const r of habit){if(sum+r.xp>CAP){r.note=(r.note?r.note+';':'')+'상한';r.xp=Math.max(0,CAP-sum);}sum+=r.xp;}
   if(info.walk>=40&&info.walk<=60){walkDays++;if(walkDays===7)award(d,'걷기 습관');}
@@ -167,7 +180,7 @@ function compute(T){
   if(bmrWk!==wk){const ws=[];for(let k=0;k<7;k++){const x=days[ds(n-k)];if(x&&x.weight!==null)ws.push(x.weight);}
    bmrW=ws.length?ws.reduce((a,b)=>a+b,0)/ws.length:(lastSeenW??START_W);bmr=mifflin(bmrW,d);bmrWk=wk;}
   info.bmr=Math.round(bmr);
-  if(info.closed&&info.mealCount>0){const burn=bmr*ACT+walkKcal(info.walk,bmrW)+strKcal(info.strMin,bmrW);const eat=Math.max(1600,info.kcal);pred-=(burn-eat)/KCAL_PER_KG;info.burn=Math.round(burn);}
+  if(info.closed&&info.mealCount>0){const burn=bmr*ACT+walkKcal(info.walk,bmrW)+strKcal(info.strMin,bmrW)+(info.gymNet||0);const eat=Math.max(1600,info.kcal);pred-=(burn-eat)/KCAL_PER_KG;info.burn=Math.round(burn);}
   info.pred=pred;
   // 보스 진행
   if(boss&&!boss.done&&d>=boss.start){const B=boss;if(info.weight===null)B.miss=true;else B.ws.push(info.weight);if(info.warn)B.low=true;
@@ -262,7 +275,7 @@ function add(e){const before=compute();raw.push(withId(e));save();const C=comput
    const def=(typeof ACH!=='undefined'?ACH:[]).find(x=>x[0]===k);
    return {name:k,desc:def?def[1]:'',xp:def?def[2]:0,ico:def?def[3]:'🏆'};
  });
- pendingFx={xp:g,todayXp:todayXp(C),levelUp:Math.floor(C.total/100)>Math.floor(before.total/100),ach:newAch,fire:!!(e&&(e.type==='exercise'||e.type==='meal_close'))};
+ pendingFx={xp:g,todayXp:todayXp(C),levelUp:Math.floor(C.total/100)>Math.floor(before.total/100),ach:newAch,fire:!!(e&&(e.type==='exercise'||e.type==='gym'||e.type==='meal_close'))};
  toast(g>0?`+${g} XP 획득!`+(pendingFx.levelUp?' 🎉 레벨업!':''):'기록했어요');render();}
 function del(id){if(!confirm('이 기록을 지울까요?'))return;raw=raw.filter(e=>e.id!==id);save();render();}
 const NAV=[['home','🏠','홈'],['coach','🎯','코칭'],['quest','📋','퀘스트'],['log','📊','기록'],['ach','🛡️','업적'],['me','👤','내정보']];
@@ -300,7 +313,7 @@ function questDefs(C){const t=C.days[C.today];const meals=MEALS.filter(m=>t.meal
  {id:'hw',ic:'💪',t:hwName,s:'장비 없이 단계 코칭',tags:['매일','홈트'],p:hwToday?1:0,max:1,lab:hwToday?'완료':'미완료',xp:15,done:!!hwToday,go:"if(window.DGWorkout)DGWorkout.open();"},
  {id:'kcal',ic:'🔥',t:'오늘 섭취 1,800kcal 이하',s:`지금 ${Math.round(t.kcal||0)}kcal`,tags:['매일','식단'],p:Math.min(t.kcal||0,1800),max:1800,lab:`${Math.round(t.kcal||0)} / 1,800kcal`,xp:20,done:!!(t.closed&&t.kcal<=1800&&t.mealCount>0),go:"tab='home';render();setTimeout(()=>{const el=document.getElementById('dinnerCard');if(el)el.scrollIntoView({block:'start'});},50)"},
  {id:'walk',ic:'👟',t:'걷기 40~60분',s:t.rest?'오늘은 통증 휴식':'관절에 무리 없이',tags:['매일','운동'],p:t.rest?60:Math.min(t.walk,60),max:40,lab:t.rest?'휴식':`${t.walk} / 40~60분`,xp:40,done:t.walk>=40||t.rest,go:"tab='log';logKind='exercise';render();"},
- {id:'water',ic:'💧',t:'물 2L 마시기',s:'틈틈이 나눠서',tags:['매일','쉬움'],p:t.water,max:2,lab:`${t.water} / 2L`,xp:5,done:t.water>=2,go:"tab='log';logKind='water';render();"}];}
+ {id:'water',ic:'💧',t:'물 2L 마시기',s:'틈틈이 나눠서',tags:['매일','쉬움'],p:t.water,max:2,lab:`${t.water} / 2L`,xp:5,done:t.water>=2,go:"tab='log';logKind='water';render();"}].concat((window.DGFitness&&DGFitness.questDef(C))?[DGFitness.questDef(C)]:[]);}
 function qGo(q){return q.go||(q.t==='식사 기록하고 마감'?"tab='log';logKind='meal';logAdding=true;mealKind=suggestMealSlot();render();setTimeout(revealMealSearch,50)"
   :q.t==='아침 공복 체중'?"tab='log';logKind='weight';render();"
   :q.t==='걷기 40~60분'?"tab='log';logKind='exercise';render();"
@@ -408,6 +421,7 @@ function home(C){const qs=questDefs(C);
   </div>
   <div class="hero-avatar avatar-frame" id="avatarSlot" data-kg="${bodyKgOf(C).toFixed(2)}" data-idle="0.25"><img class="fallback" src="char.png" alt="캐릭터"><div class="pedestal"></div><div class="avcap">누적 예상 ${bodyKgOf(C).toFixed(1)}kg</div></div>
  </section>
+ ${(window.DGFitness?DGFitness.todayCardHTML(C):'')}
  ${todayFuelHTML(C)}
  ${homeQuickHTML()}
  ${(window.DGGuide?DGGuide.dinnerHTML(C):'')}
@@ -633,7 +647,7 @@ function log(C){const T=logDate||C.today,d=C.days[T]||{mealCount:0,kcal:0,prot:0
  <div class="card"><h3>체중 기록</h3>${chart(C)}
   ${wts.slice().reverse().map(s=>`<div class="list-row"><span class="d">${s.date.slice(5).replace('-','/')}</span><div class="m"><b class="num">${s.weight}kg</b><span>감량 ${s.lost_kg}kg</span></div></div>`).join('')}
   ${Object.entries(C.weekly).map(([w,W])=>`<div class="muted">${+w+1}주차 ${W.avg?'평균 '+W.avg.toFixed(2)+'kg, 감량 '+W.loss+'kg, +'+W.xp+' XP':'기록 '+W.n+'일 (3일 미만)'}</div>`).join('')}</div>
- <div class="card"><h3>최근 기록</h3>${recent.map(e=>`<div class="list-row"><span class="d">${e.date.slice(5).replace('-','/')}</span><div class="m"><b>${esc(e.item)}${placeTag(e)?' · '+placeTag(e):''}</b><span>${esc((e.value||'')+((e.kcal||e.protein_g)?` · ${e.kcal||''}${e.protein_g?' / '+e.protein_g+'g':''}`:''))}</span></div><span class="x">${byDate[e.id]?('+'+byDate[e.id]+' XP'):'0 XP'}</span><button type="button" class="icon-btn" aria-label="삭제" onclick="del('${e.id}')">🗑️</button></div>`).join('')}</div>
+ <div class="card"><h3>최근 기록</h3>${recent.map(e=>`<div class="list-row"><span class="d">${e.date.slice(5).replace('-','/')}</span><div class="m"><b>${esc(e.type==='gym'?('🏋️ '+(e.note||e.item)):e.item)}${placeTag(e)?' · '+placeTag(e):''}</b><span>${esc((e.type==='gym'?(e.value+'분 헬스'):(e.value||''))+((e.kcal||e.protein_g)?` · ${e.kcal||''}${e.protein_g?' / '+e.protein_g+'g':''}`:''))}</span></div><span class="x">${byDate[e.id]?('+'+byDate[e.id]+' XP'):'0 XP'}</span><button type="button" class="icon-btn" aria-label="삭제" onclick="del('${e.id}')">🗑️</button></div>`).join('')}</div>
  </div>`;}
 function sub(t){const d=($('#dt')&&$('#dt').value)||today();
  if(t==='weight'){const v=+$('#w').value;if(v>30)addWeight(d,v);else toast('체중을 확인해 주세요');}

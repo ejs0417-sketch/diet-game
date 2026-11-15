@@ -61,7 +61,7 @@ function dayExKcal(info,w){
   const metW=(typeof MET_WALK==='number')?MET_WALK:3.5;
   const metS=(typeof MET_STR==='number')?MET_STR:3.5;
   const fn=(typeof exKcal==='function')?exKcal:(m,n,ww)=>(m-1)*ww*n/60;
-  return fn(metW,info.walk||0,w)+fn(metS,info.strMin||0,w);
+  return fn(metW,info.walk||0,w)+fn(metS,info.strMin||0,w)+(+info.gymNet||0);
 }
 function addDays(d,n){
   if(typeof ds==='function'&&typeof dn==='function')return ds(dn(d)+n);
@@ -72,7 +72,7 @@ function addDays(d,n){
 }
 function dayLogged(info){
   if(!info)return false;
-  return !!(info.mealCount>0||info.closed||(+info.kcal>0)||(+info.walk>0)||(+info.strMin>0)||info.strength);
+  return !!(info.mealCount>0||info.closed||(+info.kcal>0)||(+info.walk>0)||(+info.strMin>0)||info.strength||(+info.gymMin>0));
 }
 // 기록된 섭취·운동만 모아 일별 누적 예상. 끼니/운동이 없는 날은 값을 유지(섭취 0으로 가정하지 않음).
 // bodyKg: 마지막 실측 체중 이후의 일별 이론 감량을 더해 캐릭터·오늘 추정에 씀.
@@ -143,7 +143,7 @@ function forecastHTML(C){
   const w=C&&C.weight;
   const metW=(typeof MET_WALK==='number')?MET_WALK:3.5;
   const metS=(typeof MET_STR==='number')?MET_STR:3.5;
-  const burn=(typeof exKcal==='function')?(exKcal(metW,t.walk||0,w)+exKcal(metS,t.strMin||0,w)):0;
+  const burn=(typeof exKcal==='function')?(exKcal(metW,t.walk||0,w)+exKcal(metS,t.strMin||0,w)+(+t.gymNet||0)):(+t.gymNet||0);
   const f=forecastWeight({weight:w,eatenKcal:t.kcal||0,exerciseKcal:burn,date:C&&C.today});
   if(!f.ok&&f.needProfile){
     return `<div class="card guide-card" id="forecastCard"><h3 style="margin:0 0 8px">오늘의 예상</h3>
@@ -160,7 +160,7 @@ function forecastHTML(C){
     <div class="forecast-extras">걷기 +10분이면 오늘 <b class="num">${fmtKgDelta(f.day+plus10)}</b><span class="muted"> (${fmtKgDelta(plus10)})</span>
       · +20분이면 오늘 <b class="num">${fmtKgDelta(f.day+plus20)}</b><span class="muted"> (${fmtKgDelta(plus20)})</span></div>
     ${trail.ok?forecastChartSVG(trail):''}
-    <div class="muted" style="margin-top:8px;font-size:12px;line-height:18px">오늘 섭취 ${Math.round(eaten).toLocaleString('ko-KR')}kcal − TDEE ${Math.round(f.tdee).toLocaleString('ko-KR')}kcal${f.burnEx>=1?` − 운동 ${Math.round(f.burnEx)}kcal`:''}. 끼니나 운동을 기록한 날만 누적해요. Mifflin-St Jeor × 활동량, 7,700kcal≈1kg. 실제 체중은 수분·오차로 달라질 수 있어요.</div>
+    <div class="muted" style="margin-top:8px;font-size:12px;line-height:18px">오늘 섭취 ${Math.round(eaten).toLocaleString('ko-KR')}kcal − TDEE ${Math.round(f.tdee).toLocaleString('ko-KR')}kcal${f.burnEx>=1?` − 운동 ${Math.round(f.burnEx)}kcal`:''}${t.gymKcal?` (헬스 소모 ${Math.round(t.gymKcal)}kcal 중 기초대사 제외 ${Math.round(t.gymNet||0)}kcal 반영)`:''}. 끼니나 운동을 기록한 날만 누적해요. Mifflin-St Jeor × 활동량, 7,700kcal≈1kg. 실제 체중은 수분·오차로 달라질 수 있어요.</div>
   </div>`;
 }
 
@@ -550,7 +550,9 @@ function nextDayHTML(C){
 function headline(C){
   const t=(C&&C.days&&C.days[C.today])||{};
   const kcal=t.kcal||0, prot=t.prot||0, meals=t.mealCount||0, streak=C&&C.streak||0;
-  const walk=t.walk||0, str=t.strength||t.strMin, rest=!!t.rest;
+  const walk=t.walk||0, str=t.strength||t.strMin||t.gymMin, rest=!!t.rest;
+  const gp=(root.DGFitness&&C&&C.today)?root.DGFitness.planFor(C.today):null;
+  const goGym="tab='home';render();setTimeout(()=>{const el=document.getElementById('gymCard');if(el)el.scrollIntoView({block:'start'});},50)";
   const evs=(typeof raw!=='undefined'?raw:[]);
   const nxt=nextMealOf({today:C&&C.today,events:evs,eatenKcal:kcal,eatenProt:prot});
   const seeRec="const el=document.getElementById('dinnerCard');if(el)el.scrollIntoView({block:'start'});";
@@ -559,6 +561,8 @@ function headline(C){
   if(kcal>=2300)return {id:'overeat',text:'오늘은 이미 '+Math.round(kcal).toLocaleString('ko-KR')+'kcal예요. '+(nxt.close?'여기서 마감하는 게 좋아요.':'다음 식사는 가볍게 가 볼까요?'),act,go:seeRec};
   if(kcal>=2000&&meals>0)return {id:'overeat-soft',text:'칼로리가 목표보다 조금 많아요. '+(nxt.close?'오늘은 여기서 마감해 보세요.':'다음 한 끼만 가볍게 챙겨 봐요.'),act,go:seeRec};
   if(meals>0&&prot<100)return {id:'prot',text:'단백질이 아직 '+Math.round(prot)+'g이에요. 다음 식사에서 한 끼만 채워도 균형이 맞아요.',act:'다음 식사 추천 보기',go:seeRec};
+  if(t.gymDone)return {id:'gym-done',text:'오늘 헬스 계획 완료! 약 '+Math.round(t.gymKcal||0).toLocaleString('ko-KR')+'kcal 태웠어요. 물 충분히 마시고 7시간 이상 주무세요.',act:'오늘의 운동 보기',go:goGym};
+  if(!rest&&walk<40&&!str&&gp&&!gp.rest)return {id:'gym',text:'오늘은 헬스 '+gp.week+'주차 계획이 있어요. 약 '+gp.min+'분, 무리하지 말고 대화 가능한 강도로 시작해요.',act:'오늘의 운동 보기',go:goGym};
   if(!rest&&walk<40&&!str)return {id:'ex',text:'오늘은 아직 운동 기록이 없어요. 홈트 한 세트만 해도 몸이 가벼워져요.',act:'홈트 시작',go:"if(window.DGWorkout)DGWorkout.open();"};
   if(streak>=3&&(t.weight!=null||meals>0))return {id:'streak',text:'연속 '+streak+'일 기록 중이에요. 이 페이스 정말 좋아요.',act:'오늘 체중 기록',go:"tab='log';logKind='weight';render();"};
   if(!meals)return {id:'meal',text:'끼니를 적으면 예상 체중과 다음 식사 추천이 더 정확해져요. 천천히 시작해도 돼요.',act:'식사 기록',go:openLog};
